@@ -205,4 +205,61 @@ input[type="text"]:focus, input[type="password"]:focus {
   cursor: not-allowed;
   opacity: 0.7;
 }
+
+@media (max-width: 768px) {
+  :global(html), :global(body), :global(#app) {
+    overflow: auto !important;
+  }
+
+  .login-page {
+    position: relative;
+    min-height: 100vh;
+    min-height: 100dvh;
+    width: 100%;
+    height: auto;
+    padding: 16px;
+    padding-top: max(16px, env(safe-area-inset-top));
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    align-items: flex-start;
+  }
+
+  .login-card {
+    width: 100%;
+    max-width: 380px;
+    margin: auto 0;
+    padding: 28px 20px;
+    border-radius: 12px;
+  }
+
+  .login-title {
+    font-size: 20px;
+  }
+
+  input[type="text"], input[type="password"] {
+    font-size: 16px;
+    padding: 12px 14px;
+  }
+
+  .btn-login {
+    padding: 14px;
+    min-height: 48px;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-page {
+    padding: 12px;
+    padding-top: max(12px, env(safe-area-inset-top));
+  }
+
+  .login-card {
+    padding: 24px 16px;
+    box-shadow: 0 10px 30px -8px rgba(0, 0, 0, 0.4);
+  }
+
+  .login-tips {
+    font-size: 11px;
+    word-break: break-all;
+  }
+}
 </style>

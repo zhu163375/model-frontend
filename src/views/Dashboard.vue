@@ -18,7 +18,8 @@
           data-placement="top"
           @click="currentUser.isLeader ? cancelLeaderRole() : applyForLeader()"
         >
-          {{ currentUser.isLeader ? '取消导师角色' : '申请成为 Leader' }}
+          <span class="btn-text-full">{{ currentUser.isLeader ? '取消导师角色' : '申请成为 Leader' }}</span>
+          <span class="btn-text-short">{{ currentUser.isLeader ? '取消角色' : '申请 Leader' }}</span>
         </button>
         <span class="user-display">当前登录: {{ currentUser.username }}</span>
         <button class="btn btn-danger btn-logout" @click="handleLogout">退出注销</button>
@@ -485,4 +486,174 @@ input[type="number"] { width: 45px; padding: 4px; text-align: center; }
 
 .follow-info { font-size: 14px; line-height: 1.8; }
 .empty-text { color: #94a3b8; font-size: 14px; }
+
+.btn-text-short { display: none; }
+
+@media (max-width: 768px) {
+  :global(html), :global(body), :global(#app) {
+    overflow: auto !important;
+    height: auto !important;
+    min-height: 100% !important;
+  }
+
+  .system-body {
+    position: relative;
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    height: auto;
+    min-height: 56px;
+    padding: 10px 16px;
+    padding-top: max(10px, env(safe-area-inset-top));
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .header-left, .header-right {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .header-left {
+    flex: 1 1 100%;
+    justify-content: space-between;
+  }
+
+  .header-right {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+  }
+
+  .system-title {
+    font-size: 16px;
+  }
+
+  .user-display {
+    font-size: 12px;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .btn-text-full { display: none; }
+  .btn-text-short { display: inline; }
+
+  .container {
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: 0;
+    padding: 12px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    gap: 12px;
+  }
+
+  .main-hall {
+    height: auto;
+    min-height: 320px;
+    max-height: 55vh;
+  }
+
+  .hall-title {
+    padding: 12px 16px;
+    font-size: 15px;
+  }
+
+  .table-wrapper {
+    overflow-x: auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 12px 12px;
+  }
+
+  table {
+    min-width: 640px;
+  }
+
+  th, td {
+    padding: 10px 6px;
+    font-size: 13px;
+  }
+
+  .sidebar {
+    height: auto;
+    overflow: visible;
+  }
+
+  .card {
+    padding: 14px;
+  }
+
+  .card h3 {
+    font-size: 15px;
+  }
+
+  .btn {
+    min-height: 36px;
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .btn-logout {
+    padding: 6px 10px;
+  }
+
+  .ratio-chip {
+    padding: 4px 6px;
+    margin-left: 4px;
+  }
+
+  input[type="number"] {
+    width: 52px;
+    padding: 6px 4px;
+    font-size: 14px;
+  }
+
+  .js-smart-tooltip {
+    max-width: calc(100vw - 24px);
+    white-space: normal;
+    word-break: break-word;
+  }
+}
+
+@media (max-width: 480px) {
+  header {
+    padding: 8px 12px;
+  }
+
+  .header-right {
+    justify-content: space-between;
+  }
+
+  .user-display {
+    order: -1;
+    flex: 1 1 100%;
+    max-width: none;
+    text-align: left;
+  }
+
+  .system-title {
+    font-size: 15px;
+  }
+
+  .container {
+    padding: 8px;
+  }
+
+  .main-hall {
+    max-height: 50vh;
+  }
+
+  table {
+    min-width: 580px;
+  }
+}
 </style>
