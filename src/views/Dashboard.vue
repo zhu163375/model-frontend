@@ -127,13 +127,22 @@
                 <td>{{ req.name }}</td>
                 <td>{{ req.ratio }}x</td>
                 <td>
-                  <button
-                    class="btn btn-success btn-sm"
-                    :disabled="actionLoading"
-                    @click="approveRequest(req.id)"
-                  >
-                    同意
-                  </button>
+                  <div class="request-actions">
+                    <button
+                      class="btn btn-success btn-sm"
+                      :disabled="actionLoading"
+                      @click="approveRequest(req.id)"
+                    >
+                      同意
+                    </button>
+                    <button
+                      class="btn btn-danger btn-sm"
+                      :disabled="actionLoading"
+                      @click="rejectRequest(req.id)"
+                    >
+                      拒绝
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -542,6 +551,19 @@ const approveRequest = async (requestId) => {
   try {
     await tradersApi.approveRequest(requestId)
     await Promise.all([loadPendingRequests(), loadFollowers(), loadLeaders()])
+    destroyTooltip()
+  } catch (error) {
+    handleApiError(error)
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+const rejectRequest = async (requestId) => {
+  actionLoading.value = true
+  try {
+    await tradersApi.rejectRequest(requestId)
+    await Promise.all([loadPendingRequests(), loadLeaders()])
     destroyTooltip()
   } catch (error) {
     handleApiError(error)

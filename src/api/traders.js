@@ -23,3 +23,9 @@ export function approveRequest(requestId) {
     method: 'POST',
   })
 }
+
+export function rejectRequest(requestId) {
+  return request(`/api/traders/me/requests/${requestId}/reject`, {
+    method: 'POST',
+  })
+}

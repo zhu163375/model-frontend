@@ -74,6 +74,18 @@ th {
 }
 td { padding: 14px 8px; border-bottom: 1px solid var(--border); font-size: 14px; white-space: nowrap; }
 .sub-table { table-layout: auto; }
+.sub-table td:last-child { white-space: nowrap; }
+
+.request-actions {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.request-actions .btn {
+  flex-shrink: 0;
+}
 .empty-td { text-align: center; color: #94a3b8; padding: 10px 0; }
 
 .card { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
@@ -236,6 +248,12 @@ input[type="number"] { width: 45px; padding: 4px; text-align: center; }
   .btn {
     min-height: 36px;
     padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .request-actions .btn {
+    min-height: 0;
+    padding: 4px 8px;
     font-size: 12px;
   }
 
