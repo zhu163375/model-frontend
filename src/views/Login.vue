@@ -2,7 +2,7 @@
   <div class="login-page">
     <div class="login-card">
       <div class="login-header">
-        <h2 class="login-title">跟单系统登录</h2>
+        <h2 class="login-title">控制台登录</h2>
         <p class="login-subtitle">请输入您的凭证以进入控制台</p>
       </div>
 

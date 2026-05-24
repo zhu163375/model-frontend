@@ -2,7 +2,7 @@
   <div v-if="currentUser" class="system-body">
     <header>
       <div class="header-left">
-        <span class="system-title">跟单系统控制台</span>
+        <span class="system-title">控制台</span>
         <span :class="['badge', currentUser.isLeader ? 'badge-leader' : 'badge-user']">
           {{ currentUser.isLeader ? '导师 (Leader)' : '普通用户' }}
         </span>
@@ -93,10 +93,13 @@
           <div v-if="followState.traderId" class="follow-info">
             <div>目标导师: <b>{{ followState.traderName }}</b></div>
             <div>跟随比率: <b>{{ followState.ratio }}x</b></div>
+            <p class="unfollow-hint">
+              解除后不再复制该导师的新订单；您账户中已开立的持仓不会自动平仓，请自行在交易平台处理。
+            </p>
             <button
               class="btn btn-danger btn-unfollow"
               :disabled="actionLoading"
-              @click="unfollow"
+              @click="confirmUnfollow"
             >
               解除跟随
             </button>
@@ -108,7 +111,7 @@
             <button
               class="btn btn-danger btn-unfollow"
               :disabled="actionLoading"
-              @click="cancelPendingRequest"
+              @click="confirmCancelPendingRequest"
             >
               撤销申请
             </button>
@@ -151,26 +154,18 @@
 
         <div v-if="currentUser.isLeader" class="card">
           <h3>👥 我的跟随者 ({{ myActiveFollowers.length }}/10)</h3>
+          <p class="leader-followers-hint">跟随者需在其控制台自行解除跟随，导师无法代为移除。</p>
           <table class="sub-table">
             <thead>
-              <tr><th>跟随者</th><th>比率</th><th>操作</th></tr>
+              <tr><th>跟随者</th><th>比率</th></tr>
             </thead>
             <tbody>
               <tr v-if="myActiveFollowers.length === 0">
-                <td colspan="3" class="empty-td">暂无跟随者</td>
+                <td colspan="2" class="empty-td">暂无跟随者</td>
               </tr>
               <tr v-for="follower in myActiveFollowers" :key="follower.id">
                 <td>{{ follower.name }}</td>
                 <td>{{ follower.ratio }}x</td>
-                <td>
-                  <button
-                    class="btn btn-danger btn-sm"
-                    :disabled="actionLoading"
-                    @click="removeFollower(follower.id)"
-                  >
-                    移除
-                  </button>
-                </td>
               </tr>
             </tbody>
           </table>
@@ -186,12 +181,24 @@
     >
       {{ tooltip.text }}
     </div>
+
+    <ConfirmDialog
+      v-model:open="confirmDialog.open"
+      :title="confirmDialog.title"
+      :description="confirmDialog.description"
+      :items="confirmDialog.items"
+      :confirm-text="confirmDialog.confirmText"
+      :cancel-text="confirmDialog.cancelText"
+      :variant="confirmDialog.variant"
+      @confirm="handleConfirmDialog"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, reactive, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
+import ConfirmDialog from '../components/ConfirmDialog.vue'
 import * as authApi from '../api/auth.js'
 import * as tradersApi from '../api/traders.js'
 import * as followsApi from '../api/follows.js'
@@ -216,6 +223,33 @@ const pendingRequestState = reactive({
   traderName: '',
   ratio: null,
 })
+
+const confirmDialog = reactive({
+  open: false,
+  title: '',
+  description: '',
+  items: [],
+  confirmText: '确定',
+  cancelText: '取消',
+  variant: 'primary',
+  onConfirm: null,
+})
+
+function openConfirmDialog(options) {
+  confirmDialog.title = options.title
+  confirmDialog.description = options.description ?? ''
+  confirmDialog.items = options.items ?? []
+  confirmDialog.confirmText = options.confirmText ?? '确定'
+  confirmDialog.cancelText = options.cancelText ?? '取消'
+  confirmDialog.variant = options.variant ?? 'primary'
+  confirmDialog.onConfirm = options.onConfirm ?? null
+  confirmDialog.open = true
+}
+
+function handleConfirmDialog() {
+  confirmDialog.onConfirm?.()
+  confirmDialog.onConfirm = null
+}
 
 const displayName = computed(() => {
   if (!currentUser.value) return ''
@@ -518,6 +552,30 @@ const follow = async (leader) => {
   }
 }
 
+const confirmUnfollow = () => {
+  openConfirmDialog({
+    title: '确定解除跟随？',
+    items: [
+      '解除后将不再复制该导师的新订单',
+      '已开立的持仓不会自动平仓，请自行在交易平台处理',
+      '解除后可重新向其他导师发起申请',
+    ],
+    confirmText: '确认解除',
+    variant: 'danger',
+    onConfirm: unfollow,
+  })
+}
+
+const confirmCancelPendingRequest = () => {
+  openConfirmDialog({
+    title: '确定撤销申请？',
+    description: '撤销后可重新选择导师并提交申请。',
+    confirmText: '确认撤销',
+    variant: 'primary',
+    onConfirm: cancelPendingRequest,
+  })
+}
+
 const unfollow = async () => {
   actionLoading.value = true
   try {
@@ -572,19 +630,6 @@ const rejectRequest = async (requestId) => {
   }
 }
 
-const removeFollower = async (followRecordId) => {
-  actionLoading.value = true
-  try {
-    await tradersApi.removeFollower(followRecordId)
-    await loadFollowers()
-    await loadLeaders()
-    destroyTooltip()
-  } catch (error) {
-    handleApiError(error)
-  } finally {
-    actionLoading.value = false
-  }
-}
 </script>
 
 <style scoped src="./Dashboard.css"></style>
@@ -601,5 +646,13 @@ const removeFollower = async (followRecordId) => {
   margin: 8px 0 12px;
   font-size: 13px;
   color: #b45309;
+}
+
+.unfollow-hint,
+.leader-followers-hint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #64748b;
 }
 </style>
