@@ -203,8 +203,16 @@ input[type="number"] { width: 45px; padding: 4px; text-align: center; }
     padding: 0 12px 12px;
   }
 
-  table {
-    min-width: 640px;
+  .main-hall table {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .main-hall table th:nth-child(2),
+  .main-hall table td:nth-child(2),
+  .main-hall table th:nth-child(4),
+  .main-hall table td:nth-child(4) {
+    display: none;
   }
 
   th, td {
@@ -279,9 +287,5 @@ input[type="number"] { width: 45px; padding: 4px; text-align: center; }
 
   .main-hall {
     max-height: 50vh;
-  }
-
-  table {
-    min-width: 580px;
   }
 }

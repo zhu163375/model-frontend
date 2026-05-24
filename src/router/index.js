@@ -1,21 +1,25 @@
-import { createRouter, createWebHistory } from "vue-router";
-import Dashboard from "../views/Dashboard.vue"; // 假设你有一个 HomeView 组件
-import Login from "../views/Login.vue";
+import { createRouter, createWebHistory } from 'vue-router'
+import Dashboard from '../views/Dashboard.vue'
+import Login from '../views/Login.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
-      path: "/dashboard",
-      name: "dashboard",
-      component: Dashboard,
+      path: '/',
+      redirect: '/login',
     },
     {
-      path: "/login",
-      name: "login",
+      path: '/login',
+      name: 'login',
       component: Login,
     },
+    {
+      path: '/dashboard',
+      name: 'dashboard',
+      component: Dashboard,
+    },
   ],
-});
+})
 
-export default router;
+export default router
