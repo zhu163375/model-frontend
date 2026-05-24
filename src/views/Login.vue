@@ -9,23 +9,23 @@
       <form @submit.prevent="handleLogin" class="login-form">
         <div class="form-item">
           <label for="username">账号</label>
-          <input 
+          <input
             id="username"
-            type="text" 
-            v-model="loginForm.username" 
-            placeholder="普通: user123 | 导师: leader888" 
-            required 
+            type="text"
+            v-model="loginForm.account"
+            placeholder="普通: user123 | 导师: leader888"
+            required
           />
         </div>
 
         <div class="form-item">
           <label for="password">密码</label>
-          <input 
-            id="password" 
-            type="password" 
-            v-model="loginForm.password" 
-            placeholder="默认密码均为: 123456" 
-            required 
+          <input
+            id="password"
+            type="password"
+            v-model="loginForm.password"
+            placeholder="默认密码均为: 123456"
+            required
           />
         </div>
 
@@ -44,35 +44,39 @@
 <script setup>
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
+import * as authApi from '../api/auth.js'
+import { ApiError } from '../api/http.js'
 
 const router = useRouter()
 const loading = ref(false)
 
 const loginForm = reactive({
-  username: 'leader888',
-  password: '123456'
+  account: 'leader888',
+  password: '123456',
 })
+
+function saveSession(token, user) {
+  localStorage.setItem('auth_token', token)
+  localStorage.setItem(
+    'current_user',
+    JSON.stringify({
+      id: user.id,
+      username: user.username,
+      nickName: user.nickName,
+      isLeader: user.isLeader,
+    }),
+  )
+}
 
 const handleLogin = async () => {
   loading.value = true
   try {
-    // 模拟接口响应延迟
-    await new Promise(resolve => setTimeout(resolve, 600))
-    
-    // 根据账号分配不同身份并存入缓存，供 Dashboard 页面读取
-    if (loginForm.username === 'user123' && loginForm.password === '123456') {
-      localStorage.setItem('current_user', JSON.stringify({ username: 'user123', isLeader: false }))
-      localStorage.setItem('auth_token', 'mock_user_token')
-      router.push('/dashboard')
-    } else if (loginForm.username === 'leader888' && loginForm.password === '123456') {
-      localStorage.setItem('current_user', JSON.stringify({ username: 'leader888', isLeader: true }))
-      localStorage.setItem('auth_token', 'mock_leader_token')
-      router.push('/dashboard')
-    } else {
-      alert('账号或密码错误！')
-    }
+    const { token, user } = await authApi.login(loginForm.account, loginForm.password)
+    saveSession(token, user)
+    router.push('/dashboard')
   } catch (error) {
-    console.error(error)
+    const message = error instanceof ApiError ? error.message : '登录失败，请稍后重试'
+    alert(message)
   } finally {
     loading.value = false
   }
