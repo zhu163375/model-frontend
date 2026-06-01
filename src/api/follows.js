@@ -11,6 +11,10 @@ export function createFollow(traderId, followRatio) {
   })
 }
 
-export function unfollow() {
-  return request('/api/follows/me', { method: 'DELETE' })
+export function unfollow(followRecordId) {
+  return request(`/api/follows/me/${followRecordId}`, { method: 'DELETE' })
+}
+
+export function cancelPendingRequest(requestId) {
+  return request(`/api/follows/me/requests/${requestId}`, { method: 'DELETE' })
 }

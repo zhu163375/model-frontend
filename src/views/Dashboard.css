@@ -100,12 +100,34 @@ td { padding: 14px 8px; border-bottom: 1px solid var(--border); font-size: 14px;
 .btn-success { background: var(--success); }
 .btn-outline { background: transparent; border: 1px solid var(--primary); color: var(--primary); }
 .btn-outline:hover { background: #eff6ff; }
+.btn-full {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fdba74;
+  cursor: not-allowed;
+  opacity: 1 !important;
+}
+.btn-full:hover { background: #fff7ed; }
 .btn-logout { padding: 4px 12px; font-size: 12px; }
 .btn-unfollow { margin-top: 8px; width: 100%; padding: 4px; }
 .btn-sm { padding: 2px 8px; font-size: 12px; }
 
-.btn:disabled, .ratio-chip.disabled { background: #e2e8f0; color: #94a3b8; cursor: not-allowed; border-color: #e2e8f0; pointer-events: auto !important; }
-.btn:disabled { opacity: 0.5 !important; }
+.btn:disabled:not(.btn-full), .ratio-chip.disabled {
+  background: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
+  border-color: #e2e8f0;
+  pointer-events: auto !important;
+  opacity: 0.5 !important;
+}
+.btn:disabled.btn-full {
+  background: #fff7ed;
+  color: #c2410c;
+  border-color: #fdba74;
+  cursor: not-allowed;
+  pointer-events: auto !important;
+  opacity: 1 !important;
+}
 
 .input-tooltip-wrapper { display: inline-block; pointer-events: auto; }
 .input-tooltip-wrapper input:disabled { background: #e2e8f0; color: #94a3b8; cursor: not-allowed; border: 1px solid #cbd5e1; }

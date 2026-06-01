@@ -56,7 +56,9 @@
                       v-model.number="leader.inputRatio"
                       step="0.1"
                       min="0.1"
+                      max="2"
                       :disabled="getFollowStatus(leader).disabled"
+                      @input="onFollowRatioInput(leader, $event)"
                     > x
                   </div>
                 </td>
@@ -89,34 +91,42 @@
 
       <div class="sidebar">
         <div v-if="!currentUser.isLeader" class="card">
-          <h3>📋 我的当前跟随</h3>
-          <div v-if="followState.traderId" class="follow-info">
-            <div>目标导师: <b>{{ followState.traderName }}</b></div>
-            <div>跟随比率: <b>{{ followState.ratio }}x</b></div>
-            <p class="unfollow-hint">
-              解除后不再复制该导师的新订单；您账户中已开立的持仓不会自动平仓，请自行在交易平台处理。
-            </p>
-            <button
-              class="btn btn-danger btn-unfollow"
-              :disabled="actionLoading"
-              @click="confirmUnfollow"
-            >
-              解除跟随
-            </button>
+          <h3>📋 我的跟随 ({{ myFollows.length }})</h3>
+          <div v-if="myFollows.length > 0" class="follow-list">
+            <div v-for="follow in myFollows" :key="follow.id" class="follow-info">
+              <div>目标导师: <b>{{ follow.traderName }}</b></div>
+              <div>跟随比率: <b>{{ follow.ratio }}x</b></div>
+              <p class="unfollow-hint">
+                解除后不再复制该导师的新订单；已开立的持仓不会自动平仓，请自行在交易平台处理。
+              </p>
+              <button
+                class="btn btn-danger btn-unfollow"
+                :disabled="actionLoading"
+                @click="confirmUnfollow(follow)"
+              >
+                解除跟随
+              </button>
+            </div>
           </div>
-          <div v-else-if="pendingRequestState.traderId" class="follow-info">
-            <div>申请导师: <b>{{ pendingRequestState.traderName }}</b></div>
-            <div>申请比率: <b>{{ pendingRequestState.ratio }}x</b></div>
-            <p class="pending-hint">等待导师审批中…</p>
-            <button
-              class="btn btn-danger btn-unfollow"
-              :disabled="actionLoading"
-              @click="confirmCancelPendingRequest"
-            >
-              撤销申请
-            </button>
+          <div v-else class="empty-text">暂无已生效的跟随</div>
+
+          <h3 v-if="myPendingRequests.length > 0" class="pending-section-title">
+            ⏳ 待审批申请 ({{ myPendingRequests.length }})
+          </h3>
+          <div v-if="myPendingRequests.length > 0" class="follow-list">
+            <div v-for="req in myPendingRequests" :key="req.id" class="follow-info">
+              <div>申请导师: <b>{{ req.traderName }}</b></div>
+              <div>申请比率: <b>{{ req.ratio }}x</b></div>
+              <p class="pending-hint">等待导师审批中…</p>
+              <button
+                class="btn btn-danger btn-unfollow"
+                :disabled="actionLoading"
+                @click="confirmCancelPendingRequest(req)"
+              >
+                撤销申请
+              </button>
+            </div>
           </div>
-          <div v-else class="empty-text">暂无任何跟单关系</div>
         </div>
 
         <div v-else-if="pendingRequests.length > 0" class="card">
@@ -212,17 +222,8 @@ const leaders = ref([])
 const myActiveFollowers = ref([])
 const pendingRequests = ref([])
 
-const followState = reactive({
-  traderId: null,
-  traderName: '',
-  ratio: null,
-})
-
-const pendingRequestState = reactive({
-  traderId: null,
-  traderName: '',
-  ratio: null,
-})
+const myFollows = ref([])
+const myPendingRequests = ref([])
 
 const confirmDialog = reactive({
   open: false,
@@ -261,7 +262,7 @@ const isRoleActionDisabled = computed(() => {
   if (currentUser.value.isLeader) {
     return myActiveFollowers.value.length > 0 || pendingRequests.value.length > 0
   }
-  return !!followState.traderId || !!pendingRequestState.traderId
+  return myFollows.value.length > 0 || myPendingRequests.value.length > 0
 })
 
 const roleActionTooltip = computed(() => {
@@ -273,10 +274,8 @@ const roleActionTooltip = computed(() => {
     if (pendingRequests.value.length > 0) {
       return '当前存在未处理的跟单申请'
     }
-  } else if (followState.traderId) {
-    return '当前已绑定跟随其他导师，多重身份互斥'
-  } else if (pendingRequestState.traderId) {
-    return '当前有待审批的跟单申请'
+  } else if (myFollows.value.length > 0 || myPendingRequests.value.length > 0) {
+    return '当前仍有跟单关系或待审批申请'
   }
   return ''
 })
@@ -294,7 +293,52 @@ function persistUser() {
   localStorage.setItem('current_user', JSON.stringify(currentUser.value))
 }
 
+const FOLLOW_RATIO_MIN = 0.1
+const FOLLOW_RATIO_MAX = 2
+
+function normalizeFollowRatio(ratio) {
+  if (typeof ratio !== 'number' || Number.isNaN(ratio)) return null
+  return Math.round(ratio * 10) / 10
+}
+
+function hasAtMostOneDecimal(ratio) {
+  return Math.abs(ratio * 10 - Math.round(ratio * 10)) < 1e-9
+}
+
+function isValidFollowRatio(ratio) {
+  if (typeof ratio !== 'number' || Number.isNaN(ratio)) return false
+  return (
+    ratio >= FOLLOW_RATIO_MIN &&
+    ratio <= FOLLOW_RATIO_MAX &&
+    hasAtMostOneDecimal(ratio)
+  )
+}
+
+function onFollowRatioInput(leader, event) {
+  const input = event.target
+  const raw = input.value
+  if (raw === '' || raw === '-') return
+
+  const dotIndex = raw.indexOf('.')
+  if (dotIndex !== -1 && raw.length - dotIndex - 1 > 1) {
+    const clamped = raw.slice(0, dotIndex + 2)
+    input.value = clamped
+    leader.inputRatio = Number(clamped)
+  }
+}
+
+function resolveLeaderInputRatio(traderId, fallback = 1.0) {
+  const ratio =
+    findMyFollow(traderId)?.ratio ??
+    findMyPendingRequest(traderId)?.ratio ??
+    fallback
+  return normalizeFollowRatio(ratio) ?? fallback
+}
+
 async function loadLeaders() {
+  const previousRatios = new Map(
+    leaders.value.map((leader) => [leader.id, leader.inputRatio]),
+  )
   const { leaders: list } = await tradersApi.listTraders()
   leaders.value = list.map((leader) => ({
     id: leader.id,
@@ -302,38 +346,25 @@ async function loadLeaders() {
     count: leader.count,
     maxFollowers: leader.maxFollowers,
     isFull: leader.isFull,
-    inputRatio: 1.0,
+    inputRatio: resolveLeaderInputRatio(
+      leader.id,
+      previousRatios.get(leader.id) ?? 1.0,
+    ),
   }))
 }
 
-function clearPendingRequestState() {
-  pendingRequestState.traderId = null
-  pendingRequestState.traderName = ''
-  pendingRequestState.ratio = null
+function findMyFollow(traderId) {
+  return myFollows.value.find((follow) => follow.traderId === traderId)
 }
 
-function clearFollowState() {
-  followState.traderId = null
-  followState.traderName = ''
-  followState.ratio = null
+function findMyPendingRequest(traderId) {
+  return myPendingRequests.value.find((request) => request.traderId === traderId)
 }
 
 async function loadMyFollow() {
-  const { follow, pendingRequest } = await followsApi.getMyFollow()
-  if (follow) {
-    followState.traderId = follow.traderId
-    followState.traderName = follow.traderName
-    followState.ratio = follow.ratio
-    clearPendingRequestState()
-  } else if (pendingRequest) {
-    clearFollowState()
-    pendingRequestState.traderId = pendingRequest.traderId
-    pendingRequestState.traderName = pendingRequest.traderName || ''
-    pendingRequestState.ratio = pendingRequest.ratio
-  } else {
-    clearFollowState()
-    clearPendingRequestState()
-  }
+  const { follows, pendingRequests } = await followsApi.getMyFollow()
+  myFollows.value = follows
+  myPendingRequests.value = pendingRequests
 }
 
 async function loadFollowers() {
@@ -358,6 +389,10 @@ async function loadDashboard() {
       await Promise.all([loadFollowers(), loadPendingRequests()])
     } else {
       await loadMyFollow()
+      leaders.value = leaders.value.map((leader) => ({
+        ...leader,
+        inputRatio: resolveLeaderInputRatio(leader.id, leader.inputRatio),
+      }))
     }
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
@@ -379,23 +414,19 @@ const getFollowStatus = (leader) => {
   if (currentUser.value?.isLeader) {
     reason = '当前身份为导师，系统限制多重身份混用'
     disabled = true
-  } else if (followState.traderId === leader.id) {
+  } else if (findMyFollow(leader.id)) {
     disabled = true
     btnText = '已跟随'
     btnClass = 'btn-success'
-  } else if (pendingRequestState.traderId === leader.id) {
+  } else if (findMyPendingRequest(leader.id)) {
     disabled = true
     btnText = '待审批'
     btnClass = 'btn-outline'
-  } else if (followState.traderId || pendingRequestState.traderId) {
-    reason = followState.traderId
-      ? '系统限制同时跟随多位导师'
-      : '已有待审批的跟单申请'
-    disabled = true
   } else if (leader.isFull) {
     reason = `该导师的可跟随名额已满 (${leader.maxFollowers}/${leader.maxFollowers})`
     disabled = true
     btnText = '已满员'
+    btnClass = 'btn-full'
   }
 
   return { reason, disabled, btnText, btnClass }
@@ -489,14 +520,14 @@ const handleLogout = () => {
 }
 
 const applyForLeader = async () => {
-  if (followState.traderId || pendingRequestState.traderId) return
+  if (myFollows.value.length > 0 || myPendingRequests.value.length > 0) return
   actionLoading.value = true
   try {
     const user = await authApi.applyLeader()
     currentUser.value = mapUser(user)
     persistUser()
-    clearFollowState()
-    clearPendingRequestState()
+    myFollows.value = []
+    myPendingRequests.value = []
     await loadLeaders()
     await Promise.all([loadFollowers(), loadPendingRequests()])
     destroyTooltip()
@@ -532,17 +563,23 @@ const setRatio = (leader, value) => {
 }
 
 const follow = async (leader) => {
-  if (!leader.inputRatio || leader.inputRatio <= 0) {
-    alert('请输入有效比率')
+  if (!isValidFollowRatio(leader.inputRatio)) {
+    alert('跟随比例需在 0.1 到 2 之间，且最多一位小数')
     return
   }
   actionLoading.value = true
   try {
-    const { request } = await followsApi.createFollow(leader.id, Number(leader.inputRatio))
-    clearFollowState()
-    pendingRequestState.traderId = request.traderId
-    pendingRequestState.traderName = request.traderName || leader.name
-    pendingRequestState.ratio = request.ratio
+    const followRatio = Number(leader.inputRatio)
+    const { request } = await followsApi.createFollow(leader.id, followRatio)
+    myPendingRequests.value = [
+      ...myPendingRequests.value,
+      {
+        id: request.id,
+        traderId: request.traderId,
+        traderName: request.traderName || leader.name,
+        ratio: request.ratio ?? followRatio,
+      },
+    ]
     await loadLeaders()
     destroyTooltip()
   } catch (error) {
@@ -552,35 +589,35 @@ const follow = async (leader) => {
   }
 }
 
-const confirmUnfollow = () => {
+const confirmUnfollow = (follow) => {
   openConfirmDialog({
-    title: '确定解除跟随？',
+    title: `确定解除对 ${follow.traderName} 的跟随？`,
     items: [
       '解除后将不再复制该导师的新订单',
       '已开立的持仓不会自动平仓，请自行在交易平台处理',
-      '解除后可重新向其他导师发起申请',
+      '解除后可重新向该导师或其他导师发起申请',
     ],
     confirmText: '确认解除',
     variant: 'danger',
-    onConfirm: unfollow,
+    onConfirm: () => unfollow(follow),
   })
 }
 
-const confirmCancelPendingRequest = () => {
+const confirmCancelPendingRequest = (requestItem) => {
   openConfirmDialog({
-    title: '确定撤销申请？',
+    title: `确定撤销对 ${requestItem.traderName} 的申请？`,
     description: '撤销后可重新选择导师并提交申请。',
     confirmText: '确认撤销',
     variant: 'primary',
-    onConfirm: cancelPendingRequest,
+    onConfirm: () => cancelPendingRequest(requestItem),
   })
 }
 
-const unfollow = async () => {
+const unfollow = async (follow) => {
   actionLoading.value = true
   try {
-    await followsApi.unfollow()
-    clearFollowState()
+    await followsApi.unfollow(follow.id)
+    myFollows.value = myFollows.value.filter((item) => item.id !== follow.id)
     await loadLeaders()
     destroyTooltip()
   } catch (error) {
@@ -590,11 +627,13 @@ const unfollow = async () => {
   }
 }
 
-const cancelPendingRequest = async () => {
+const cancelPendingRequest = async (requestItem) => {
   actionLoading.value = true
   try {
-    await followsApi.unfollow()
-    clearPendingRequestState()
+    await followsApi.cancelPendingRequest(requestItem.id)
+    myPendingRequests.value = myPendingRequests.value.filter(
+      (item) => item.id !== requestItem.id,
+    )
     await loadLeaders()
     destroyTooltip()
   } catch (error) {
@@ -646,6 +685,29 @@ const rejectRequest = async (requestId) => {
   margin: 8px 0 12px;
   font-size: 13px;
   color: #b45309;
+}
+
+.pending-section-title {
+  margin: 20px 0 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  font-size: 15px;
+}
+
+.follow-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.follow-list .follow-info {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.follow-list .follow-info:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
 }
 
 .unfollow-hint,
