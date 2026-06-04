@@ -3,7 +3,6 @@
     <div class="login-card">
       <div class="login-header">
         <h2 class="login-title">控制台登录</h2>
-        <p class="login-subtitle">请输入您的凭证以进入控制台</p>
       </div>
 
       <form @submit.prevent="handleLogin" class="login-form">
@@ -13,7 +12,7 @@
             id="username"
             type="text"
             v-model="loginForm.login"
-            placeholder="请输入注册手机号，如 18276707652"
+            placeholder="请输入手机号"
             required
           />
         </div>
@@ -24,15 +23,10 @@
             id="password"
             type="password"
             v-model="loginForm.password"
-            placeholder="请输入登录密码"
+            placeholder="请输入密码"
             required
           />
         </div>
-
-        <p class="login-tips">
-          请使用 <b>fa_user.mobile</b> 注册手机号登录（与 new-gold-node 一致）<br>
-          测试库需先执行 seed；勿用仅存在于生产库的手机号
-        </p>
 
         <button type="submit" class="btn btn-login" :disabled="loading">
           {{ loading ? '正在验证...' : '登 录' }}
