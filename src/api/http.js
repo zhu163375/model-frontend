@@ -8,12 +8,19 @@ export class ApiError extends Error {
   }
 }
 
+function extractErrorMessage(data, fallback) {
+  if (!data || typeof data !== 'object') return fallback
+  if (typeof data.msg === 'string' && data.msg) return data.msg
+  if (typeof data.message === 'string' && data.message) return data.message
+  return fallback
+}
+
 export async function request(path, options = {}) {
   const headers = { ...options.headers }
 
   const token = localStorage.getItem('auth_token')
   if (token) {
-    headers.Authorization = `Bearer ${token}`
+    headers.token = token
   }
 
   const hasBody = options.body != null && options.body !== ''
@@ -36,8 +43,17 @@ export async function request(path, options = {}) {
     }
   }
 
-  if (!response.ok) {
-    throw new ApiError(data?.message || response.statusText || '请求失败', response.status)
+  const envelopeStatus =
+    data && typeof data.status === 'number' ? data.status : null
+  const businessFailed =
+    envelopeStatus !== null && envelopeStatus !== 200
+
+  if (!response.ok || businessFailed) {
+    const status = envelopeStatus ?? response.status
+    throw new ApiError(
+      extractErrorMessage(data, response.statusText || '请求失败'),
+      status,
+    )
   }
 
   return data

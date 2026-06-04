@@ -8,12 +8,12 @@
 
       <form @submit.prevent="handleLogin" class="login-form">
         <div class="form-item">
-          <label for="username">账号</label>
+          <label for="username">手机号</label>
           <input
             id="username"
             type="text"
-            v-model="loginForm.account"
-            placeholder="普通: user123 | 导师: leader888"
+            v-model="loginForm.login"
+            placeholder="请输入注册手机号，如 18276707652"
             required
           />
         </div>
@@ -24,13 +24,14 @@
             id="password"
             type="password"
             v-model="loginForm.password"
-            placeholder="默认密码均为: 123456"
+            placeholder="请输入登录密码"
             required
           />
         </div>
 
         <p class="login-tips">
-          普通账号: user123 &nbsp;&nbsp;&nbsp; 导师账号: leader888<br>默认密码均为: 123456
+          请使用 <b>fa_user.mobile</b> 注册手机号登录（与 new-gold-node 一致）<br>
+          测试库需先执行 seed；勿用仅存在于生产库的手机号
         </p>
 
         <button type="submit" class="btn btn-login" :disabled="loading">
@@ -51,8 +52,8 @@ const router = useRouter()
 const loading = ref(false)
 
 const loginForm = reactive({
-  account: 'leader888',
-  password: '123456',
+  login: '',
+  password: '',
 })
 
 function saveSession(token, user) {
@@ -71,7 +72,7 @@ function saveSession(token, user) {
 const handleLogin = async () => {
   loading.value = true
   try {
-    const { token, user } = await authApi.login(loginForm.account, loginForm.password)
+    const { token, user } = await authApi.login(loginForm.login, loginForm.password)
     saveSession(token, user)
     router.push('/dashboard')
   } catch (error) {

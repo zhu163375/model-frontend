@@ -1,10 +1,24 @@
 import { request } from './http.js'
 
-export function login(account, password) {
-  return request('/api/auth/login', {
+export async function login(login, password) {
+  const res = await request('/api/user/login', {
     method: 'POST',
-    body: JSON.stringify({ account, password }),
+    body: JSON.stringify({ login, password }),
   })
+
+  const data = res.data ?? {}
+  const user = data.user ?? {}
+
+  return {
+    token: data.access_token,
+    refreshTtl: data.refresh_ttl,
+    user: {
+      id: user.id,
+      username: user.mobile || user.username,
+      nickName: user.nickname || user.username || user.mobile,
+      isLeader: user.is_leader === 1,
+    },
+  }
 }
 
 export function getMe() {
