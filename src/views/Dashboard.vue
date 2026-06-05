@@ -2,7 +2,7 @@
   <div v-if="currentUser" class="system-body">
     <header>
       <div class="header-left">
-        <span class="system-title">控制台</span>
+        <span class="system-title">实物料跟单社区</span>
         <span :class="['badge', currentUser.isLeader ? 'badge-leader' : 'badge-user']">
           {{ currentUser.isLeader ? '导师 (Leader)' : '普通用户' }}
         </span>
@@ -54,9 +54,9 @@
                     <input
                       type="number"
                       v-model.number="leader.inputRatio"
-                      step="0.1"
-                      min="0.1"
-                      max="2"
+                      step="1"
+                      :min="FOLLOW_RATIO_MIN"
+                      :max="FOLLOW_RATIO_MAX"
                       :disabled="getFollowStatus(leader).disabled"
                       @input="onFollowRatioInput(leader, $event)"
                     > x
@@ -64,7 +64,7 @@
                 </td>
                 <td>
                   <span
-                    v-for="r in [0.5, 1.0, 2.0]"
+                    v-for="r in [1, 10, 50]"
                     :key="r"
                     :class="['ratio-chip', { disabled: getFollowStatus(leader).disabled }]"
                     :data-title="getFollowStatus(leader).reason"
@@ -213,6 +213,12 @@ import * as authApi from '../api/auth.js'
 import * as tradersApi from '../api/traders.js'
 import * as followsApi from '../api/follows.js'
 import { ApiError } from '../api/http.js'
+import {
+  FOLLOW_RATIO_MIN,
+  FOLLOW_RATIO_MAX,
+  normalizeFollowRatio,
+  isValidFollowRatio,
+} from '../constants/follow-ratio.js'
 
 const router = useRouter()
 const currentUser = ref(null)
@@ -293,41 +299,19 @@ function persistUser() {
   localStorage.setItem('current_user', JSON.stringify(currentUser.value))
 }
 
-const FOLLOW_RATIO_MIN = 0.1
-const FOLLOW_RATIO_MAX = 2
-
-function normalizeFollowRatio(ratio) {
-  if (typeof ratio !== 'number' || Number.isNaN(ratio)) return null
-  return Math.round(ratio * 10) / 10
-}
-
-function hasAtMostOneDecimal(ratio) {
-  return Math.abs(ratio * 10 - Math.round(ratio * 10)) < 1e-9
-}
-
-function isValidFollowRatio(ratio) {
-  if (typeof ratio !== 'number' || Number.isNaN(ratio)) return false
-  return (
-    ratio >= FOLLOW_RATIO_MIN &&
-    ratio <= FOLLOW_RATIO_MAX &&
-    hasAtMostOneDecimal(ratio)
-  )
-}
-
 function onFollowRatioInput(leader, event) {
   const input = event.target
   const raw = input.value
   if (raw === '' || raw === '-') return
 
-  const dotIndex = raw.indexOf('.')
-  if (dotIndex !== -1 && raw.length - dotIndex - 1 > 1) {
-    const clamped = raw.slice(0, dotIndex + 2)
-    input.value = clamped
-    leader.inputRatio = Number(clamped)
+  if (raw.includes('.')) {
+    const intVal = Math.round(Number(raw))
+    input.value = String(intVal)
+    leader.inputRatio = intVal
   }
 }
 
-function resolveLeaderInputRatio(traderId, fallback = 1.0) {
+function resolveLeaderInputRatio(traderId, fallback = 1) {
   const ratio =
     findMyFollow(traderId)?.ratio ??
     findMyPendingRequest(traderId)?.ratio ??
@@ -348,7 +332,7 @@ async function loadLeaders() {
     isFull: leader.isFull,
     inputRatio: resolveLeaderInputRatio(
       leader.id,
-      previousRatios.get(leader.id) ?? 1.0,
+      previousRatios.get(leader.id) ?? 1,
     ),
   }))
 }
@@ -564,7 +548,7 @@ const setRatio = (leader, value) => {
 
 const follow = async (leader) => {
   if (!isValidFollowRatio(leader.inputRatio)) {
-    alert('跟随比例需在 0.1 到 2 之间，且最多一位小数')
+    alert(`跟随比例需在 ${FOLLOW_RATIO_MIN} 到 ${FOLLOW_RATIO_MAX} 之间，且为整数`)
     return
   }
   actionLoading.value = true

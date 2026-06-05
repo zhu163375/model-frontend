@@ -2,7 +2,7 @@
   <div class="login-page">
     <div class="login-card">
       <div class="login-header">
-        <h2 class="login-title">控制台登录</h2>
+        <h2 class="login-title">实物料跟单社区</h2>
       </div>
 
       <form @submit.prevent="handleLogin" class="login-form">
