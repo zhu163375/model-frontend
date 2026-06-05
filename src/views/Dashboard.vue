@@ -34,6 +34,7 @@
             <thead>
               <tr>
                 <th>导师姓名</th>
+                <th class="th-strategy-intro">策略介绍</th>
                 <th>当前人数</th>
                 <th>设置跟随比率</th>
                 <th>快捷设置</th>
@@ -42,10 +43,52 @@
             </thead>
             <tbody>
               <tr v-if="leaders.length === 0">
-                <td colspan="5" class="empty-td">暂无导师数据</td>
+                <td colspan="6" class="empty-td">暂无导师数据</td>
               </tr>
               <tr v-for="leader in leaders" :key="leader.id">
                 <td><b>{{ leader.name }}</b></td>
+                <td class="strategy-intro-cell">
+                  <div
+                    class="strategy-panel"
+                    :class="{ 'has-edit': canEditStrategyIntro(leader) }"
+                    :data-title="leader.strategyIntro || ''"
+                    :data-tooltip-wrap="leader.strategyIntro ? 'true' : null"
+                  >
+                    <p
+                      class="strategy-preview"
+                      :class="{ 'is-empty': !leader.strategyIntro }"
+                    >
+                      {{ leader.strategyIntro || '暂未填写策略介绍' }}
+                    </p>
+                    <button
+                      v-if="canEditStrategyIntro(leader)"
+                      type="button"
+                      class="strategy-edit-icon"
+                      aria-label="编辑策略介绍"
+                      data-title="编辑策略介绍"
+                      @click.stop="startEditStrategy(leader)"
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path
+                          d="M12 20h9"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                        />
+                        <path
+                          d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </td>
                 <td :style="{ color: leader.isFull ? 'var(--danger)' : '#1e293b' }">
                   {{ leader.count }} / {{ leader.maxFollowers }} 人
                 </td>
@@ -163,7 +206,7 @@
         </div>
 
         <div v-if="currentUser.isLeader" class="card">
-          <h3>👥 我的跟随者 ({{ myActiveFollowers.length }}/10)</h3>
+          <h3>👥 我的跟随者 ({{ myActiveFollowers.length }}/{{ myMaxFollowers }})</h3>
           <p class="leader-followers-hint">跟随者需在其控制台自行解除跟随，导师无法代为移除。</p>
           <table class="sub-table">
             <thead>
@@ -186,11 +229,54 @@
     <div
       v-if="tooltip.visible"
       class="js-smart-tooltip"
-      :class="[tooltip.placement]"
+      :class="[tooltip.placement, { 'is-wide': tooltip.wrap }]"
       :style="{ top: tooltip.top + 'px', left: tooltip.left + 'px', opacity: tooltip.opacity }"
     >
       {{ tooltip.text }}
     </div>
+
+    <Teleport to="body">
+      <div
+        v-if="editingStrategyLeader"
+        class="strategy-modal-overlay"
+        role="presentation"
+        @click.self="cancelEditStrategy"
+      >
+        <div class="strategy-modal" role="dialog" aria-labelledby="strategy-modal-title">
+          <h3 id="strategy-modal-title" class="strategy-modal-title">策略介绍</h3>
+          <p class="strategy-modal-hint">简要说明交易风格、品种偏好、风控原则等</p>
+          <textarea
+            v-model="strategyDraft"
+            class="strategy-modal-input"
+            rows="6"
+            maxlength="500"
+            placeholder="请输入策略介绍…"
+            :disabled="editingStrategyLeader.strategySaving"
+          />
+          <div class="strategy-modal-footer">
+            <span class="strategy-char-count">{{ strategyDraft.length }}/500</span>
+            <div class="strategy-panel-actions">
+              <button
+                type="button"
+                class="strategy-btn strategy-btn--ghost"
+                :disabled="editingStrategyLeader.strategySaving"
+                @click="cancelEditStrategy"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                class="strategy-btn strategy-btn--primary"
+                :disabled="!isStrategyDraftDirty(editingStrategyLeader) || editingStrategyLeader.strategySaving || actionLoading"
+                @click="saveStrategyIntro(editingStrategyLeader)"
+              >
+                {{ editingStrategyLeader.strategySaving ? '保存中…' : '保存' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <ConfirmDialog
       v-model:open="confirmDialog.open"
@@ -219,6 +305,7 @@ import {
   normalizeFollowRatio,
   isValidFollowRatio,
 } from '../constants/follow-ratio.js'
+import { DEFAULT_MAX_FOLLOWERS } from '../constants/trader-quota.js'
 
 const router = useRouter()
 const currentUser = ref(null)
@@ -230,6 +317,12 @@ const pendingRequests = ref([])
 
 const myFollows = ref([])
 const myPendingRequests = ref([])
+const editingStrategyLeaderId = ref(null)
+const strategyDraft = ref('')
+
+const editingStrategyLeader = computed(() =>
+  leaders.value.find((leader) => leader.id === editingStrategyLeaderId.value) ?? null,
+)
 
 const confirmDialog = reactive({
   open: false,
@@ -257,6 +350,10 @@ function handleConfirmDialog() {
   confirmDialog.onConfirm?.()
   confirmDialog.onConfirm = null
 }
+
+const myMaxFollowers = computed(() => {
+  return currentUser.value?.maxFollowers ?? DEFAULT_MAX_FOLLOWERS
+})
 
 const displayName = computed(() => {
   if (!currentUser.value) return ''
@@ -292,6 +389,7 @@ function mapUser(user) {
     username: user.username,
     nickName: user.nickName,
     isLeader: user.isLeader,
+    maxFollowers: user.maxFollowers,
   }
 }
 
@@ -320,6 +418,7 @@ function resolveLeaderInputRatio(traderId, fallback = 1) {
 }
 
 async function loadLeaders() {
+  cancelEditStrategy()
   const previousRatios = new Map(
     leaders.value.map((leader) => [leader.id, leader.inputRatio]),
   )
@@ -330,11 +429,50 @@ async function loadLeaders() {
     count: leader.count,
     maxFollowers: leader.maxFollowers,
     isFull: leader.isFull,
+    strategyIntro: leader.strategyIntro ?? '',
+    savedStrategyIntro: leader.strategyIntro ?? '',
+    strategySaving: false,
     inputRatio: resolveLeaderInputRatio(
       leader.id,
       previousRatios.get(leader.id) ?? 1,
     ),
   }))
+}
+
+function canEditStrategyIntro(leader) {
+  return currentUser.value?.isLeader && currentUser.value.id === leader.id
+}
+
+function isStrategyDraftDirty(leader) {
+  return (strategyDraft.value ?? '').trim() !== (leader.savedStrategyIntro ?? '').trim()
+}
+
+function startEditStrategy(leader) {
+  destroyTooltip()
+  editingStrategyLeaderId.value = leader.id
+  strategyDraft.value = leader.strategyIntro ?? ''
+  document.body.style.overflow = 'hidden'
+}
+
+function cancelEditStrategy() {
+  editingStrategyLeaderId.value = null
+  strategyDraft.value = ''
+  document.body.style.overflow = ''
+}
+
+async function saveStrategyIntro(leader) {
+  if (!canEditStrategyIntro(leader) || !isStrategyDraftDirty(leader)) return
+  leader.strategySaving = true
+  try {
+    const { strategyIntro } = await tradersApi.updateMyStrategyIntro(strategyDraft.value ?? '')
+    leader.strategyIntro = strategyIntro
+    leader.savedStrategyIntro = strategyIntro
+    cancelEditStrategy()
+  } catch (error) {
+    handleApiError(error, '策略介绍保存失败')
+  } finally {
+    leader.strategySaving = false
+  }
 }
 
 function findMyFollow(traderId) {
@@ -423,6 +561,7 @@ const tooltip = reactive({
   left: 0,
   placement: 'placement-top',
   opacity: 0,
+  wrap: false,
 })
 
 const handleGlobalMouseEnter = async (e) => {
@@ -432,6 +571,7 @@ const handleGlobalMouseEnter = async (e) => {
   if (!text) return
 
   tooltip.text = text
+  tooltip.wrap = target.getAttribute('data-tooltip-wrap') === 'true'
   tooltip.visible = true
   tooltip.opacity = 0
 
@@ -471,6 +611,13 @@ const handleGlobalMouseEnter = async (e) => {
 const destroyTooltip = () => {
   tooltip.visible = false
   tooltip.text = ''
+  tooltip.wrap = false
+}
+
+function onStrategyModalKeydown(event) {
+  if (event.key === 'Escape' && editingStrategyLeaderId.value) {
+    cancelEditStrategy()
+  }
 }
 
 onMounted(() => {
@@ -484,12 +631,15 @@ onMounted(() => {
     if (e.target.closest('[data-title]')) destroyTooltip()
   }, true)
   document.addEventListener('scroll', destroyTooltip, true)
+  window.addEventListener('keydown', onStrategyModalKeydown)
 })
 
 onUnmounted(() => {
   document.body.removeEventListener('mouseenter', handleGlobalMouseEnter, true)
   document.body.removeEventListener('mouseleave', destroyTooltip, true)
   document.removeEventListener('scroll', destroyTooltip, true)
+  window.removeEventListener('keydown', onStrategyModalKeydown)
+  document.body.style.overflow = ''
 })
 
 function handleApiError(error, fallback = '操作失败') {

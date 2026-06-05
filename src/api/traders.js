@@ -29,3 +29,10 @@ export function rejectRequest(requestId) {
     method: 'POST',
   })
 }
+
+export function updateMyStrategyIntro(strategyIntro) {
+  return request('/api/traders/me/strategy-intro', {
+    method: 'PATCH',
+    body: JSON.stringify({ strategyIntro }),
+  })
+}
