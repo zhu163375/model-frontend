@@ -33,17 +33,22 @@
           <table>
             <thead>
               <tr>
-                <th>导师姓名</th>
+                <th>导师名称</th>
                 <th class="th-strategy-intro">策略介绍</th>
-                <th>当前人数</th>
-                <th>设置跟随比率</th>
-                <th>快捷设置</th>
-                <th>操作</th>
+                <th class="th-stat">胜率</th>
+                <th class="th-stat">盈利率</th>
+                <th class="th-count">当前人数</th>
+                <th class="th-ratio">
+                  <span class="th-ratio-full">设置跟随比率</span>
+                  <span class="th-ratio-short">设置跟随比例</span>
+                </th>
+                <th class="th-quick">快捷设置</th>
+                <th class="th-action">操作</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="leaders.length === 0">
-                <td colspan="6" class="empty-td">暂无导师数据</td>
+                <td colspan="8" class="empty-td">暂无导师数据</td>
               </tr>
               <tr v-for="leader in leaders" :key="leader.id">
                 <td><b>{{ leader.name }}</b></td>
@@ -89,10 +94,16 @@
                     </button>
                   </div>
                 </td>
-                <td :style="{ color: leader.isFull ? 'var(--danger)' : '#1e293b' }">
+                <td class="td-stat">
+                  <span :class="statClass(leader.winRate)">{{ formatRate(leader.winRate) }}</span>
+                </td>
+                <td class="td-stat">
+                  <span :class="statClass(leader.profitRate, true)">{{ formatRate(leader.profitRate) }}</span>
+                </td>
+                <td class="td-count" :style="{ color: leader.isFull ? 'var(--danger)' : '#1e293b' }">
                   {{ leader.count }} / {{ leader.maxFollowers }} 人
                 </td>
-                <td>
+                <td class="td-ratio">
                   <div class="input-tooltip-wrapper" :data-title="getFollowStatus(leader).reason">
                     <input
                       type="number"
@@ -105,7 +116,7 @@
                     > x
                   </div>
                 </td>
-                <td>
+                <td class="td-quick">
                   <span
                     v-for="r in [1, 10, 50]"
                     :key="r"
@@ -116,9 +127,9 @@
                     {{ r }}x
                   </span>
                 </td>
-                <td>
+                <td class="td-action">
                   <button
-                    :class="['btn', getFollowStatus(leader).btnClass]"
+                    :class="['btn', 'btn-action', getFollowStatus(leader).btnClass]"
                     :disabled="getFollowStatus(leader).disabled || actionLoading"
                     :data-title="getFollowStatus(leader).reason"
                     @click="follow(leader)"
@@ -244,7 +255,6 @@
       >
         <div class="strategy-modal" role="dialog" aria-labelledby="strategy-modal-title">
           <h3 id="strategy-modal-title" class="strategy-modal-title">策略介绍</h3>
-          <p class="strategy-modal-hint">简要说明交易风格、品种偏好、风控原则等</p>
           <textarea
             v-model="strategyDraft"
             class="strategy-modal-input"
@@ -430,6 +440,8 @@ async function loadLeaders() {
     maxFollowers: leader.maxFollowers,
     isFull: leader.isFull,
     strategyIntro: leader.strategyIntro ?? '',
+    winRate: leader.winRate ?? null,
+    profitRate: leader.profitRate ?? null,
     savedStrategyIntro: leader.strategyIntro ?? '',
     strategySaving: false,
     inputRatio: resolveLeaderInputRatio(
@@ -437,6 +449,18 @@ async function loadLeaders() {
       previousRatios.get(leader.id) ?? 1,
     ),
   }))
+}
+
+function formatRate(value) {
+  if (value == null || Number.isNaN(value)) return '--'
+  return `${value}%`
+}
+
+function statClass(value, colorize = false) {
+  if (value == null || !colorize) return 'stat-value'
+  if (value > 0) return 'stat-value stat-positive'
+  if (value < 0) return 'stat-value stat-negative'
+  return 'stat-value'
 }
 
 function canEditStrategyIntro(leader) {
