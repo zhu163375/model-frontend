@@ -51,16 +51,7 @@
               </tr>
               <tr v-for="leader in leaders" :key="leader.id">
                 <td class="td-name">
-                  <div class="hall-leader-cell">
-                    <b class="hall-leader-name">{{ leader.name }}</b>
-                    <span
-                      v-if="canApplyFollow"
-                      class="hall-follow-badge"
-                      :class="`hall-follow-badge--${getFollowStatus(leader).status}`"
-                    >
-                      {{ getFollowStatus(leader).label }}
-                    </span>
-                  </div>
+                  <b class="hall-leader-name">{{ leader.name }}</b>
                 </td>
                 <td class="td-stat">
                   <span :class="statClass(leader.winRate)">{{ formatRate(leader.winRate) }}</span>
@@ -1061,33 +1052,9 @@ const rejectRequest = async (requestId) => {
   color: #64748b;
 }
 
-.hall-leader-cell {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  min-width: 0;
-}
-
 .hall-leader-name {
   font-size: 14px;
 }
-
-.hall-follow-badge {
-  display: inline-flex;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.4;
-}
-
-.hall-follow-badge--ready { background: #eff6ff; color: #1d4ed8; }
-.hall-follow-badge--following { background: #d1fae5; color: #047857; }
-.hall-follow-badge--pending { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
-.hall-follow-badge--full,
-.hall-follow-badge--no-funds { background: #fee2e2; color: #b91c1c; }
-.hall-follow-badge--ratio-overflow { background: #ffedd5; color: #c2410c; }
 
 .follow-panel-title {
   margin: 0 0 12px;
