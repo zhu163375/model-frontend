@@ -11,10 +11,19 @@
           class="confirm-dialog"
           role="alertdialog"
           :aria-labelledby="titleId"
-          :aria-describedby="descId"
+          :aria-describedby="hasBodyContent ? descId : undefined"
         >
           <div class="confirm-icon" :class="`confirm-icon--${variant}`" aria-hidden="true">
             <svg v-if="variant === 'danger'" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"
+                stroke="currentColor"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <svg v-else-if="variant === 'warning'" viewBox="0 0 24 24" fill="none">
               <path
                 d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"
                 stroke="currentColor"
@@ -31,19 +40,36 @@
 
           <h3 :id="titleId" class="confirm-title">{{ title }}</h3>
 
-          <p v-if="description" :id="descId" class="confirm-desc">{{ description }}</p>
-          <ul v-else-if="items.length" :id="descId" class="confirm-list">
-            <li v-for="(item, index) in items" :key="index">{{ item }}</li>
-          </ul>
+          <div v-if="hasBodyContent" :id="descId" class="confirm-body">
+            <p v-if="description" class="confirm-desc">{{ description }}</p>
 
-          <div class="confirm-actions">
-            <button type="button" class="confirm-btn confirm-btn--ghost" @click="emitCancel">
+            <dl v-if="facts.length" class="confirm-facts">
+              <div v-for="(fact, index) in facts" :key="index" class="confirm-fact">
+                <dt>{{ fact.label }}</dt>
+                <dd :class="{ 'confirm-fact__value--emphasis': fact.emphasis }">{{ fact.value }}</dd>
+              </div>
+            </dl>
+
+            <ul v-if="items.length" class="confirm-list">
+              <li v-for="(item, index) in items" :key="index">{{ item }}</li>
+            </ul>
+          </div>
+
+          <div class="confirm-actions" :class="{ 'confirm-actions--single': mode === 'notice' }">
+            <button
+              v-if="mode !== 'notice'"
+              ref="cancelButtonRef"
+              type="button"
+              class="confirm-btn confirm-btn--ghost"
+              @click="emitCancel"
+            >
               {{ cancelText }}
             </button>
             <button
+              ref="confirmButtonRef"
               type="button"
               class="confirm-btn"
-              :class="variant === 'danger' ? 'confirm-btn--danger' : 'confirm-btn--primary'"
+              :class="confirmButtonClass"
               @click="emitConfirm"
             >
               {{ confirmText }}
@@ -56,19 +82,25 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
   title: { type: String, required: true },
   description: { type: String, default: '' },
   items: { type: Array, default: () => [] },
+  facts: { type: Array, default: () => [] },
   confirmText: { type: String, default: '确定' },
   cancelText: { type: String, default: '取消' },
+  mode: {
+    type: String,
+    default: 'confirm',
+    validator: (value) => ['confirm', 'notice'].includes(value),
+  },
   variant: {
     type: String,
     default: 'primary',
-    validator: (value) => ['primary', 'danger'].includes(value),
+    validator: (value) => ['primary', 'warning', 'danger'].includes(value),
   },
 })
 
@@ -76,6 +108,18 @@ const emit = defineEmits(['update:open', 'confirm', 'cancel'])
 
 const titleId = `confirm-title-${Math.random().toString(36).slice(2, 9)}`
 const descId = `confirm-desc-${Math.random().toString(36).slice(2, 9)}`
+const cancelButtonRef = ref(null)
+const confirmButtonRef = ref(null)
+
+const hasBodyContent = computed(
+  () => Boolean(props.description) || props.items.length > 0 || props.facts.length > 0,
+)
+
+const confirmButtonClass = computed(() => {
+  if (props.variant === 'danger') return 'confirm-btn--danger'
+  if (props.variant === 'warning') return 'confirm-btn--warning'
+  return 'confirm-btn--primary'
+})
 
 function emitCancel() {
   emit('update:open', false)
@@ -91,13 +135,26 @@ function onKeydown(event) {
   if (!props.open) return
   if (event.key === 'Escape') {
     emitCancel()
+    return
   }
+  if (event.key === 'Enter' && props.mode === 'notice') {
+    event.preventDefault()
+    emitConfirm()
+  }
+}
+
+function focusDefaultButton() {
+  const target = props.mode === 'notice' ? confirmButtonRef.value : cancelButtonRef.value
+  target?.focus()
 }
 
 watch(
   () => props.open,
   (isOpen) => {
     document.body.style.overflow = isOpen ? 'hidden' : ''
+    if (isOpen) {
+      nextTick(() => focusDefaultButton())
+    }
   },
 )
 
@@ -155,6 +212,11 @@ onUnmounted(() => {
   color: #dc2626;
 }
 
+.confirm-icon--warning {
+  background: #fffbeb;
+  color: #d97706;
+}
+
 .confirm-icon--primary {
   background: #eff6ff;
   color: #2563eb;
@@ -169,16 +231,64 @@ onUnmounted(() => {
   line-height: 1.35;
 }
 
+.confirm-body {
+  margin-bottom: 20px;
+}
+
 .confirm-desc {
-  margin: 0 0 20px;
+  margin: 0 0 12px;
   font-size: 14px;
   line-height: 1.6;
   color: #64748b;
   text-align: center;
 }
 
+.confirm-body > .confirm-desc:last-child {
+  margin-bottom: 0;
+}
+
+.confirm-facts {
+  margin: 0;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.confirm-fact {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.confirm-fact + .confirm-fact {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.confirm-fact dt {
+  margin: 0;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.confirm-fact dd {
+  margin: 0;
+  color: #0f172a;
+  font-weight: 600;
+  text-align: right;
+}
+
+.confirm-fact__value--emphasis {
+  color: #d97706;
+}
+
 .confirm-list {
-  margin: 0 0 20px;
+  margin: 12px 0 0;
   padding: 12px 12px 12px 28px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
@@ -188,6 +298,10 @@ onUnmounted(() => {
   color: #475569;
 }
 
+.confirm-body > .confirm-list:first-child {
+  margin-top: 0;
+}
+
 .confirm-list li + li {
   margin-top: 8px;
 }
@@ -195,6 +309,10 @@ onUnmounted(() => {
 .confirm-actions {
   display: flex;
   gap: 10px;
+}
+
+.confirm-actions--single .confirm-btn {
+  flex: 1;
 }
 
 .confirm-btn {
@@ -227,6 +345,15 @@ onUnmounted(() => {
 
 .confirm-btn--primary:hover {
   background: #1d4ed8;
+}
+
+.confirm-btn--warning {
+  background: #d97706;
+  color: #fff;
+}
+
+.confirm-btn--warning:hover {
+  background: #b45309;
 }
 
 .confirm-btn--danger {
@@ -269,7 +396,7 @@ onUnmounted(() => {
     border-radius: 12px 12px 0 0;
   }
 
-  .confirm-actions {
+  .confirm-actions:not(.confirm-actions--single) {
     flex-direction: column-reverse;
   }
 }

@@ -30,68 +30,36 @@
       <div class="main-hall">
         <h3 class="hall-title">🏆 导师市场大厅</h3>
         <div class="table-wrapper">
-          <table>
+          <table class="hall-table">
+            <colgroup>
+              <col class="col-name">
+              <col class="col-stat">
+              <col class="col-stat">
+              <col class="col-action">
+            </colgroup>
             <thead>
               <tr>
-                <th>导师名称</th>
-                <th class="th-strategy-intro">策略介绍</th>
+                <th class="th-name">导师名称</th>
                 <th class="th-stat">胜率</th>
                 <th class="th-stat">盈利率</th>
-                <th class="th-count">当前人数</th>
-                <th class="th-ratio">
-                  <span class="th-ratio-full">设置跟随比率</span>
-                  <span class="th-ratio-short">设置跟随比例</span>
-                </th>
-                <th class="th-quick">快捷设置</th>
                 <th class="th-action">操作</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="leaders.length === 0">
-                <td colspan="8" class="empty-td">暂无导师数据</td>
+                <td colspan="4" class="empty-td">暂无导师数据</td>
               </tr>
               <tr v-for="leader in leaders" :key="leader.id">
-                <td><b>{{ leader.name }}</b></td>
-                <td class="strategy-intro-cell">
-                  <div
-                    class="strategy-panel"
-                    :class="{ 'has-edit': canEditStrategyIntro(leader) }"
-                    :data-title="leader.strategyIntro || ''"
-                    :data-tooltip-wrap="leader.strategyIntro ? 'true' : null"
-                  >
-                    <p
-                      class="strategy-preview"
-                      :class="{ 'is-empty': !leader.strategyIntro }"
+                <td class="td-name">
+                  <div class="hall-leader-cell">
+                    <b class="hall-leader-name">{{ leader.name }}</b>
+                    <span
+                      v-if="canApplyFollow"
+                      class="hall-follow-badge"
+                      :class="`hall-follow-badge--${getFollowStatus(leader).status}`"
                     >
-                      {{ leader.strategyIntro || '暂未填写策略介绍' }}
-                    </p>
-                    <button
-                      v-if="canEditStrategyIntro(leader)"
-                      type="button"
-                      class="strategy-edit-icon"
-                      aria-label="编辑策略介绍"
-                      data-title="编辑策略介绍"
-                      @click.stop="startEditStrategy(leader)"
-                    >
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path
-                          d="M12 20h9"
-                          fill="none"
-                          stroke="currentColor"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                        />
-                        <path
-                          d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"
-                          fill="none"
-                          stroke="currentColor"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                        />
-                      </svg>
-                    </button>
+                      {{ getFollowStatus(leader).label }}
+                    </span>
                   </div>
                 </td>
                 <td class="td-stat">
@@ -100,41 +68,13 @@
                 <td class="td-stat">
                   <span :class="statClass(leader.profitRate, true)">{{ formatRate(leader.profitRate) }}</span>
                 </td>
-                <td class="td-count" :style="{ color: leader.isFull ? 'var(--danger)' : '#1e293b' }">
-                  {{ leader.count }} / {{ leader.maxFollowers }} 人
-                </td>
-                <td class="td-ratio">
-                  <div class="input-tooltip-wrapper" :data-title="getFollowStatus(leader).reason">
-                    <input
-                      type="number"
-                      v-model.number="leader.inputRatio"
-                      step="1"
-                      :min="FOLLOW_RATIO_MIN"
-                      :max="FOLLOW_RATIO_MAX"
-                      :disabled="getFollowStatus(leader).disabled"
-                      @input="onFollowRatioInput(leader, $event)"
-                    > x
-                  </div>
-                </td>
-                <td class="td-quick">
-                  <span
-                    v-for="r in [1, 10, 50]"
-                    :key="r"
-                    :class="['ratio-chip', { disabled: getFollowStatus(leader).disabled }]"
-                    :data-title="getFollowStatus(leader).reason"
-                    @click="setRatio(leader, r)"
-                  >
-                    {{ r }}x
-                  </span>
-                </td>
                 <td class="td-action">
                   <button
-                    :class="['btn', 'btn-action', getFollowStatus(leader).btnClass]"
-                    :disabled="getFollowStatus(leader).disabled || actionLoading"
-                    :data-title="getFollowStatus(leader).reason"
-                    @click="follow(leader)"
+                    type="button"
+                    class="btn btn-detail"
+                    @click="openLeaderDetail(leader)"
                   >
-                    {{ getFollowStatus(leader).btnText }}
+                    详情
                   </button>
                 </td>
               </tr>
@@ -144,43 +84,67 @@
       </div>
 
       <div class="sidebar">
-        <div v-if="!currentUser.isLeader" class="card">
-          <h3>📋 我的跟随 ({{ myFollows.length }})</h3>
-          <div v-if="myFollows.length > 0" class="follow-list">
-            <div v-for="follow in myFollows" :key="follow.id" class="follow-info">
-              <div>目标导师: <b>{{ follow.traderName }}</b></div>
-              <div>跟随比率: <b>{{ follow.ratio }}x</b></div>
-              <p class="unfollow-hint">
-                解除后不再复制该导师的新订单；已开立的持仓不会自动平仓，请自行在交易平台处理。
-              </p>
+        <div v-if="!currentUser.isLeader" class="card follow-panel">
+          <div v-if="ratioQuota" class="quota-widget">
+            <div class="quota-widget-head">
+              <span class="quota-widget-title">跟单倍数配额</span>
+              <span class="quota-widget-value">
+                {{ ratioQuota.usedRatio }} / {{ ratioQuota.totalRatioCap }}
+              </span>
+            </div>
+            <div class="quota-widget-bar" aria-hidden="true">
+              <div
+                class="quota-widget-bar__fill"
+                :style="{ width: `${quotaUsedPercent}%` }"
+              />
+            </div>
+            <p class="quota-widget-meta">
+              可用余额 <b>{{ formatMoney(ratioQuota.availableBalance) }}</b> 元 · 每 1000 元 1 倍
+            </p>
+          </div>
+
+          <h3 class="follow-panel-title">我的跟随</h3>
+          <div v-if="myFollows.length > 0" class="follow-cards">
+            <article v-for="follow in myFollows" :key="follow.id" class="follow-card follow-card--active">
+              <div class="follow-card-head">
+                <span class="follow-card-name">{{ follow.traderName }}</span>
+                <span class="follow-card-badge follow-card-badge--active">跟随中</span>
+              </div>
+              <div class="follow-card-ratio">{{ follow.ratio }}x</div>
+              <p class="follow-card-hint">已开立的持仓需自行在交易平台处理</p>
               <button
-                class="btn btn-danger btn-unfollow"
+                type="button"
+                class="follow-card-btn follow-card-btn--danger"
                 :disabled="actionLoading"
                 @click="confirmUnfollow(follow)"
               >
                 解除跟随
               </button>
-            </div>
+            </article>
           </div>
           <div v-else class="empty-text">暂无已生效的跟随</div>
 
-          <h3 v-if="myPendingRequests.length > 0" class="pending-section-title">
-            ⏳ 待审批申请 ({{ myPendingRequests.length }})
-          </h3>
-          <div v-if="myPendingRequests.length > 0" class="follow-list">
-            <div v-for="req in myPendingRequests" :key="req.id" class="follow-info">
-              <div>申请导师: <b>{{ req.traderName }}</b></div>
-              <div>申请比率: <b>{{ req.ratio }}x</b></div>
-              <p class="pending-hint">等待导师审批中…</p>
-              <button
-                class="btn btn-danger btn-unfollow"
-                :disabled="actionLoading"
-                @click="confirmCancelPendingRequest(req)"
-              >
-                撤销申请
-              </button>
+          <template v-if="myPendingRequests.length > 0">
+            <h3 class="follow-panel-subtitle">待审批 ({{ myPendingRequests.length }})</h3>
+            <div class="follow-cards">
+              <article v-for="req in myPendingRequests" :key="req.id" class="follow-card follow-card--pending">
+                <div class="follow-card-head">
+                  <span class="follow-card-name">{{ req.traderName }}</span>
+                  <span class="follow-card-badge follow-card-badge--pending">待审批</span>
+                </div>
+                <div class="follow-card-ratio">{{ req.ratio }}x</div>
+                <p class="follow-card-hint">等待导师审批，撤销后释放占用倍数</p>
+                <button
+                  type="button"
+                  class="follow-card-btn follow-card-btn--cancel"
+                  :disabled="actionLoading"
+                  @click="confirmCancelPendingRequest(req)"
+                >
+                  撤销申请
+                </button>
+              </article>
             </div>
-          </div>
+          </template>
         </div>
 
         <div v-else-if="pendingRequests.length > 0" class="card">
@@ -246,6 +210,26 @@
       {{ tooltip.text }}
     </div>
 
+    <LeaderDetailModal
+      :leader="detailLeader"
+      :can-edit-strategy="detailLeader ? canEditStrategyIntro(detailLeader) : false"
+      :show-follow-section="canApplyFollow"
+      :ratio-min="FOLLOW_RATIO_MIN"
+      :max-ratio="detailLeader ? leaderMaxRatio(detailLeader) : FOLLOW_RATIO_MIN"
+      :quick-ratios="detailLeader ? quickRatioOptions(detailLeader) : []"
+      :ratio-quota="ratioQuota"
+      :follow-status="detailFollowStatus"
+      :action-loading="actionLoading"
+      :format-rate="formatRate"
+      :stat-class="statClass"
+      :format-money="formatMoney"
+      @close="closeLeaderDetail"
+      @apply="onDetailApply"
+      @set-ratio="onDetailSetRatio"
+      @ratio-input="onDetailRatioInput"
+      @edit-strategy="onDetailEditStrategy"
+    />
+
     <Teleport to="body">
       <div
         v-if="editingStrategyLeader"
@@ -293,6 +277,8 @@
       :title="confirmDialog.title"
       :description="confirmDialog.description"
       :items="confirmDialog.items"
+      :facts="confirmDialog.facts"
+      :mode="confirmDialog.mode"
       :confirm-text="confirmDialog.confirmText"
       :cancel-text="confirmDialog.cancelText"
       :variant="confirmDialog.variant"
@@ -305,6 +291,7 @@
 import { ref, computed, onMounted, onUnmounted, reactive, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
+import LeaderDetailModal from '../components/LeaderDetailModal.vue'
 import * as authApi from '../api/auth.js'
 import * as tradersApi from '../api/traders.js'
 import * as followsApi from '../api/follows.js'
@@ -314,6 +301,7 @@ import {
   FOLLOW_RATIO_MAX,
   normalizeFollowRatio,
   isValidFollowRatio,
+  buildQuickRatioOptions,
 } from '../constants/follow-ratio.js'
 import { DEFAULT_MAX_FOLLOWERS } from '../constants/trader-quota.js'
 
@@ -327,18 +315,34 @@ const pendingRequests = ref([])
 
 const myFollows = ref([])
 const myPendingRequests = ref([])
+const ratioQuota = ref(null)
 const editingStrategyLeaderId = ref(null)
 const strategyDraft = ref('')
+const detailLeaderId = ref(null)
 
 const editingStrategyLeader = computed(() =>
   leaders.value.find((leader) => leader.id === editingStrategyLeaderId.value) ?? null,
 )
+
+const detailLeader = computed(() =>
+  leaders.value.find((leader) => leader.id === detailLeaderId.value) ?? null,
+)
+
+function openLeaderDetail(leader) {
+  detailLeaderId.value = leader.id
+}
+
+function closeLeaderDetail() {
+  detailLeaderId.value = null
+}
 
 const confirmDialog = reactive({
   open: false,
   title: '',
   description: '',
   items: [],
+  facts: [],
+  mode: 'confirm',
   confirmText: '确定',
   cancelText: '取消',
   variant: 'primary',
@@ -349,11 +353,43 @@ function openConfirmDialog(options) {
   confirmDialog.title = options.title
   confirmDialog.description = options.description ?? ''
   confirmDialog.items = options.items ?? []
+  confirmDialog.facts = options.facts ?? []
+  confirmDialog.mode = options.mode ?? 'confirm'
   confirmDialog.confirmText = options.confirmText ?? '确定'
   confirmDialog.cancelText = options.cancelText ?? '取消'
   confirmDialog.variant = options.variant ?? 'primary'
   confirmDialog.onConfirm = options.onConfirm ?? null
   confirmDialog.open = true
+}
+
+/** 仅提示、单按钮关闭 */
+function openNoticeDialog(options) {
+  openConfirmDialog({
+    title: options.title,
+    description: options.description ?? '',
+    items: options.items ?? [],
+    facts: options.facts ?? [],
+    mode: 'notice',
+    confirmText: options.confirmText ?? '知道了',
+    variant: options.variant ?? 'primary',
+  })
+}
+
+function buildRatioQuotaFacts(quota, { maxSelectable } = {}) {
+  if (!quota) return []
+  const facts = [
+    { label: '可用余额', value: `${formatMoney(quota.availableBalance)} 元` },
+    { label: '总跟单倍数', value: `${quota.usedRatio} / ${quota.totalRatioCap}` },
+    { label: '配额规则', value: '每 1000 元可用 1 倍（含待审批）' },
+  ]
+  if (maxSelectable != null) {
+    facts.unshift({
+      label: '该导师最多可选',
+      value: `${maxSelectable} 倍`,
+      emphasis: true,
+    })
+  }
+  return facts
 }
 
 function handleConfirmDialog() {
@@ -393,14 +429,67 @@ const roleActionTooltip = computed(() => {
   return ''
 })
 
-function mapUser(user) {
-  return {
-    id: user.id,
-    username: user.username,
-    nickName: user.nickName,
-    isLeader: user.isLeader,
-    maxFollowers: user.maxFollowers,
+function unwrapApiPayload(payload) {
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    'data' in payload &&
+    ('status' in payload || 'msg' in payload)
+  ) {
+    return payload.data
   }
+  return payload
+}
+
+function mapUser(user) {
+  const profile = unwrapApiPayload(user) ?? {}
+  return {
+    id: profile.id,
+    username: profile.username,
+    nickName: profile.nickName,
+    isLeader: Boolean(profile.isLeader ?? profile.is_leader),
+    maxFollowers: profile.maxFollowers,
+  }
+}
+
+const canApplyFollow = computed(() => !currentUser.value?.isLeader)
+
+const quotaUsedPercent = computed(() => {
+  const cap = ratioQuota.value?.totalRatioCap ?? 0
+  const used = ratioQuota.value?.usedRatio ?? 0
+  if (cap <= 0) return 0
+  return Math.min(100, Math.round((used / cap) * 100))
+})
+
+const detailFollowStatus = computed(() => {
+  if (!detailLeader.value) return null
+  if (!canApplyFollow.value) {
+    return {
+      status: 'leader',
+      label: '导师身份',
+      reason: '当前为导师身份，无法申请跟随其他导师。',
+      disabled: true,
+      btnText: '无法申请',
+      btnClass: '',
+    }
+  }
+  return getFollowStatus(detailLeader.value)
+})
+
+function onDetailApply() {
+  if (detailLeader.value) follow(detailLeader.value)
+}
+
+function onDetailSetRatio(ratio) {
+  if (detailLeader.value) setRatio(detailLeader.value, ratio)
+}
+
+function onDetailRatioInput(event) {
+  if (detailLeader.value) onFollowRatioInput(detailLeader.value, event)
+}
+
+function onDetailEditStrategy() {
+  if (detailLeader.value) startEditStrategy(detailLeader.value)
 }
 
 function persistUser() {
@@ -412,11 +501,52 @@ function onFollowRatioInput(leader, event) {
   const raw = input.value
   if (raw === '' || raw === '-') return
 
-  if (raw.includes('.')) {
-    const intVal = Math.round(Number(raw))
+  let intVal = raw.includes('.') ? Math.round(Number(raw)) : Number(raw)
+  const max = leaderMaxRatio(leader)
+  if (Number.isFinite(intVal) && intVal > max) {
+    intVal = max
+  }
+  if (raw.includes('.') || intVal > max) {
     input.value = String(intVal)
     leader.inputRatio = intVal
   }
+}
+
+function effectiveLeaderMaxRatio(leader) {
+  if (currentUser.value?.isLeader || leader.maxFollowRatio == null) {
+    return FOLLOW_RATIO_MAX
+  }
+  return Math.max(0, Math.min(FOLLOW_RATIO_MAX, leader.maxFollowRatio))
+}
+
+function leaderMaxRatio(leader) {
+  const max = effectiveLeaderMaxRatio(leader)
+  return max >= FOLLOW_RATIO_MIN ? max : 0
+}
+
+function clampLeaderInputRatio(leader, value, fallback = 1) {
+  const max = leaderMaxRatio(leader)
+  const base = normalizeFollowRatio(value) ?? fallback
+  if (max < FOLLOW_RATIO_MIN) return FOLLOW_RATIO_MIN
+  return Math.min(Math.max(base, FOLLOW_RATIO_MIN), max)
+}
+
+function quickRatioOptions(leader) {
+  return buildQuickRatioOptions(leaderMaxRatio(leader))
+}
+
+function formatMoney(value) {
+  if (value == null || Number.isNaN(value)) return '--'
+  return Number(value).toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+}
+
+function formatFollowRatioLimitHint(leader) {
+  const max = leaderMaxRatio(leader)
+  const quota = ratioQuota.value
+  if (!quota) {
+    return `该导师最多可选 ${max} 倍`
+  }
+  return `该导师最多可选 ${max} 倍（可用余额 ${formatMoney(quota.availableBalance)} 元，总倍数 ${quota.usedRatio}/${quota.totalRatioCap}，每 1000 元 1 倍）`
 }
 
 function resolveLeaderInputRatio(traderId, fallback = 1) {
@@ -432,21 +562,25 @@ async function loadLeaders() {
   const previousRatios = new Map(
     leaders.value.map((leader) => [leader.id, leader.inputRatio]),
   )
-  const { leaders: list } = await tradersApi.listTraders()
+  const { leaders: list, ratioQuota: quota } = await tradersApi.listTraders()
+  if (!currentUser.value?.isLeader) {
+    ratioQuota.value = quota ?? null
+  }
   leaders.value = list.map((leader) => ({
     id: leader.id,
     name: leader.name,
     count: leader.count,
     maxFollowers: leader.maxFollowers,
     isFull: leader.isFull,
+    maxFollowRatio: leader.maxFollowRatio,
     strategyIntro: leader.strategyIntro ?? '',
     winRate: leader.winRate ?? null,
     profitRate: leader.profitRate ?? null,
     savedStrategyIntro: leader.strategyIntro ?? '',
     strategySaving: false,
-    inputRatio: resolveLeaderInputRatio(
-      leader.id,
-      previousRatios.get(leader.id) ?? 1,
+    inputRatio: clampLeaderInputRatio(
+      leader,
+      resolveLeaderInputRatio(leader.id, previousRatios.get(leader.id) ?? 1),
     ),
   }))
 }
@@ -508,9 +642,10 @@ function findMyPendingRequest(traderId) {
 }
 
 async function loadMyFollow() {
-  const { follows, pendingRequests } = await followsApi.getMyFollow()
+  const { follows, pendingRequests, ratioQuota: quota } = await followsApi.getMyFollow()
   myFollows.value = follows
   myPendingRequests.value = pendingRequests
+  if (quota) ratioQuota.value = quota
 }
 
 async function loadFollowers() {
@@ -527,7 +662,7 @@ async function loadDashboard() {
   pageLoading.value = true
   try {
     const user = await authApi.getMe()
-    currentUser.value = mapUser(user)
+    currentUser.value = mapUser(user ?? {})
     persistUser()
 
     await loadLeaders()
@@ -537,7 +672,10 @@ async function loadDashboard() {
       await loadMyFollow()
       leaders.value = leaders.value.map((leader) => ({
         ...leader,
-        inputRatio: resolveLeaderInputRatio(leader.id, leader.inputRatio),
+        inputRatio: clampLeaderInputRatio(
+          leader,
+          resolveLeaderInputRatio(leader.id, leader.inputRatio),
+        ),
       }))
     }
   } catch (error) {
@@ -552,30 +690,54 @@ async function loadDashboard() {
 }
 
 const getFollowStatus = (leader) => {
+  let status = 'ready'
+  let label = '可申请'
   let reason = ''
   let disabled = false
   let btnText = '申请跟随'
   let btnClass = ''
 
   if (currentUser.value?.isLeader) {
+    status = 'leader'
+    label = '导师'
     reason = '当前身份为导师，系统限制多重身份混用'
     disabled = true
+    btnText = '无法申请'
   } else if (findMyFollow(leader.id)) {
+    status = 'following'
+    label = '已跟随'
     disabled = true
     btnText = '已跟随'
     btnClass = 'btn-success'
   } else if (findMyPendingRequest(leader.id)) {
+    status = 'pending'
+    label = '待审批'
     disabled = true
     btnText = '待审批'
     btnClass = 'btn-outline'
   } else if (leader.isFull) {
+    status = 'full'
+    label = '已满员'
     reason = `该导师的可跟随名额已满 (${leader.maxFollowers}/${leader.maxFollowers})`
     disabled = true
     btnText = '已满员'
     btnClass = 'btn-full'
+  } else if (leaderMaxRatio(leader) < FOLLOW_RATIO_MIN) {
+    status = 'no-funds'
+    label = '资金不足'
+    const cap = ratioQuota.value?.totalRatioCap ?? 0
+    const used = ratioQuota.value?.usedRatio ?? 0
+    reason = `可用余额不足，总倍数上限 ${cap}，已占用 ${used}（含待审批）`
+    disabled = true
+    btnText = '资金不足'
+    btnClass = 'btn-full'
+  } else if (leader.inputRatio > leaderMaxRatio(leader)) {
+    status = 'ratio-overflow'
+    label = '倍数超限'
+    reason = formatFollowRatioLimitHint(leader)
   }
 
-  return { reason, disabled, btnText, btnClass }
+  return { status, label, reason, disabled, btnText, btnClass }
 }
 
 const tooltip = reactive({
@@ -638,9 +800,14 @@ const destroyTooltip = () => {
   tooltip.wrap = false
 }
 
-function onStrategyModalKeydown(event) {
-  if (event.key === 'Escape' && editingStrategyLeaderId.value) {
+function onModalKeydown(event) {
+  if (event.key !== 'Escape') return
+  if (editingStrategyLeaderId.value) {
     cancelEditStrategy()
+    return
+  }
+  if (detailLeaderId.value) {
+    closeLeaderDetail()
   }
 }
 
@@ -655,14 +822,14 @@ onMounted(() => {
     if (e.target.closest('[data-title]')) destroyTooltip()
   }, true)
   document.addEventListener('scroll', destroyTooltip, true)
-  window.addEventListener('keydown', onStrategyModalKeydown)
+  window.addEventListener('keydown', onModalKeydown)
 })
 
 onUnmounted(() => {
   document.body.removeEventListener('mouseenter', handleGlobalMouseEnter, true)
   document.body.removeEventListener('mouseleave', destroyTooltip, true)
   document.removeEventListener('scroll', destroyTooltip, true)
-  window.removeEventListener('keydown', onStrategyModalKeydown)
+  window.removeEventListener('keydown', onModalKeydown)
   document.body.style.overflow = ''
 })
 
@@ -717,12 +884,35 @@ const cancelLeaderRole = async () => {
 
 const setRatio = (leader, value) => {
   if (getFollowStatus(leader).disabled) return
+  if (value > leaderMaxRatio(leader)) return
   leader.inputRatio = value
 }
 
 const follow = async (leader) => {
-  if (!isValidFollowRatio(leader.inputRatio)) {
-    alert(`跟随比例需在 ${FOLLOW_RATIO_MIN} 到 ${FOLLOW_RATIO_MAX} 之间，且为整数`)
+  const max = leaderMaxRatio(leader)
+  if (max < FOLLOW_RATIO_MIN) {
+    openNoticeDialog({
+      title: '暂无法申请跟单',
+      description: '可用余额不足，无法设置跟随倍数。',
+      facts: buildRatioQuotaFacts(ratioQuota.value),
+      variant: 'warning',
+    })
+    return
+  }
+  if (!Number.isInteger(leader.inputRatio)) {
+    openNoticeDialog({
+      title: '跟随倍数格式不正确',
+      description: '跟随倍数须为整数。',
+    })
+    return
+  }
+  if (leader.inputRatio < FOLLOW_RATIO_MIN || leader.inputRatio > max) {
+    openNoticeDialog({
+      title: `跟随倍数不能超过 ${max} 倍`,
+      description: `当前输入为 ${leader.inputRatio} 倍。`,
+      facts: buildRatioQuotaFacts(ratioQuota.value, { maxSelectable: max }),
+      variant: 'warning',
+    })
     return
   }
   actionLoading.value = true
@@ -740,8 +930,23 @@ const follow = async (leader) => {
     ]
     await loadLeaders()
     destroyTooltip()
+    closeLeaderDetail()
+    openNoticeDialog({
+      title: '申请已提交',
+      description: `已向 ${leader.name} 提交 ${followRatio} 倍跟随申请，请等待导师审批。`,
+      facts: buildRatioQuotaFacts(ratioQuota.value),
+    })
   } catch (error) {
-    handleApiError(error)
+    if (error instanceof ApiError && error.status === 400) {
+      const isQuotaMessage = /倍数|余额|配额/.test(error.message)
+      openNoticeDialog({
+        title: '无法申请跟单',
+        description: error.message,
+        variant: isQuotaMessage ? 'warning' : 'primary',
+      })
+    } else {
+      handleApiError(error)
+    }
   } finally {
     actionLoading.value = false
   }
@@ -763,10 +968,20 @@ const confirmUnfollow = (follow) => {
 
 const confirmCancelPendingRequest = (requestItem) => {
   openConfirmDialog({
-    title: `确定撤销对 ${requestItem.traderName} 的申请？`,
-    description: '撤销后可重新选择导师并提交申请。',
+    title: '确定撤销申请？',
+    description: '撤销后该申请占用的跟单倍数配额将立即释放。',
+    facts: [
+      { label: '申请导师', value: requestItem.traderName },
+      { label: '跟随倍数', value: `${requestItem.ratio}x`, emphasis: true },
+      { label: '当前状态', value: '等待导师审批' },
+    ],
+    items: [
+      '撤销后可重新向该导师或其他导师发起申请',
+      '导师尚未审批，不会产生跟单关系',
+    ],
     confirmText: '确认撤销',
-    variant: 'primary',
+    cancelText: '暂不撤销',
+    variant: 'warning',
     onConfirm: () => cancelPendingRequest(requestItem),
   })
 }
@@ -839,40 +1054,212 @@ const rejectRequest = async (requestId) => {
   font-size: 14px;
 }
 
-.pending-hint {
-  margin: 8px 0 12px;
-  font-size: 13px;
-  color: #b45309;
-}
-
-.pending-section-title {
-  margin: 20px 0 12px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
-  font-size: 15px;
-}
-
-.follow-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.follow-list .follow-info {
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border);
-}
-
-.follow-list .follow-info:last-child {
-  padding-bottom: 0;
-  border-bottom: none;
-}
-
-.unfollow-hint,
 .leader-followers-hint {
   margin: 0 0 10px;
   font-size: 12px;
   line-height: 1.5;
   color: #64748b;
+}
+
+.hall-leader-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.hall-leader-name {
+  font-size: 14px;
+}
+
+.hall-follow-badge {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.hall-follow-badge--ready { background: #eff6ff; color: #1d4ed8; }
+.hall-follow-badge--following { background: #d1fae5; color: #047857; }
+.hall-follow-badge--pending { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
+.hall-follow-badge--full,
+.hall-follow-badge--no-funds { background: #fee2e2; color: #b91c1c; }
+.hall-follow-badge--ratio-overflow { background: #ffedd5; color: #c2410c; }
+
+.follow-panel-title {
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+
+.follow-panel-subtitle {
+  margin: 18px 0 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+  color: #64748b;
+}
+
+.quota-widget {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1px solid #e2e8f0;
+}
+
+.quota-widget-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.quota-widget-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.quota-widget-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
+.quota-widget-bar {
+  height: 6px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.quota-widget-bar__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+}
+
+.quota-widget-meta {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.follow-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.follow-card {
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+.follow-card--active {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.follow-card--pending {
+  border-color: var(--border);
+  border-left: 3px solid #f59e0b;
+  background: #fff;
+}
+
+.follow-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.follow-card-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.follow-card-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.follow-card-badge--active {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.follow-card-badge--pending {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+}
+
+.follow-card-ratio {
+  margin-top: 6px;
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.follow-card--active .follow-card-ratio {
+  color: #059669;
+}
+
+.follow-card--pending .follow-card-ratio {
+  color: #d97706;
+}
+
+.follow-card-hint {
+  margin: 6px 0 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #64748b;
+}
+
+.follow-card-btn {
+  width: 100%;
+  min-height: 34px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.follow-card-btn--danger {
+  border: 1px solid #fca5a5;
+  background: #fff;
+  color: #dc2626;
+}
+
+.follow-card-btn--danger:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: #f87171;
+}
+
+.follow-card-btn--cancel {
+  border: none;
+  background: #ef4444;
+  color: #fff;
+}
+
+.follow-card-btn--cancel:hover:not(:disabled) {
+  background: #dc2626;
+}
+
+.follow-card-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 </style>
