@@ -65,7 +65,7 @@
                   <span :class="statClass(leader.winRate)">{{ formatRate(leader.winRate) }}</span>
                 </td>
                 <td class="td-stat">
-                  <span :class="statClass(leader.profitRate, true)">{{ formatRate(leader.profitRate) }}</span>
+                  <span :class="statClass(leader.profitRate, true)">{{ formatProfitRate(leader.profitRate) }}</span>
                 </td>
                 <td class="td-action">
                   <button
@@ -231,6 +231,7 @@
       :follow-status="detailFollowStatus"
       :action-loading="actionLoading"
       :format-rate="formatRate"
+      :format-profit-rate="formatProfitRate"
       :stat-class="statClass"
       :format-money="formatMoney"
       @close="closeLeaderDetail"
@@ -627,6 +628,11 @@ function toggleHallSort(key) {
 function formatRate(value) {
   if (value == null || Number.isNaN(value)) return '--'
   return `${value}%`
+}
+
+function formatProfitRate(value) {
+  if (value == null || Number.isNaN(value)) return '--'
+  return `${Number(value).toFixed(2)}%`
 }
 
 function statClass(value, colorize = false) {

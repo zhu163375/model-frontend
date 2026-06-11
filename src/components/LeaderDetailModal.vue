@@ -200,6 +200,7 @@ const props = defineProps({
   followStatus: { type: Object, default: null },
   actionLoading: { type: Boolean, default: false },
   formatRate: { type: Function, required: true },
+  formatProfitRate: { type: Function, required: true },
   statClass: { type: Function, required: true },
   formatMoney: { type: Function, required: true },
 })
@@ -209,7 +210,7 @@ const emit = defineEmits(['close', 'apply', 'set-ratio', 'edit-strategy', 'ratio
 const titleId = `ld-title-${Math.random().toString(36).slice(2, 9)}`
 
 const winRateText = computed(() => props.formatRate(props.leader?.winRate))
-const profitRateText = computed(() => props.formatRate(props.leader?.profitRate))
+const profitRateText = computed(() => props.formatProfitRate(props.leader?.profitRate))
 const winRateClass = computed(() => props.statClass(props.leader?.winRate))
 const profitRateClass = computed(() => props.statClass(props.leader?.profitRate, true))
 
