@@ -18,7 +18,7 @@
           </div>
 
           <div class="ld-body">
-            <div class="ld-stats">
+            <div class="ld-stats" :class="{ 'ld-stats--duo': !showFollowerCount }">
               <div class="ld-stat">
                 <span class="ld-stat-label">胜率</span>
                 <span :class="['ld-stat-value', winRateClass]">{{ winRateText }}</span>
@@ -27,7 +27,7 @@
                 <span class="ld-stat-label">盈利率</span>
                 <span :class="['ld-stat-value', profitRateClass]">{{ profitRateText }}</span>
               </div>
-              <div class="ld-stat">
+              <div v-if="showFollowerCount" class="ld-stat">
                 <span class="ld-stat-label">当前人数</span>
                 <span class="ld-stat-value" :class="{ 'ld-stat-value--danger': leader.isFull }">
                   {{ leader.count }} / {{ leader.maxFollowers }} 人
@@ -190,6 +190,7 @@ import { computed } from 'vue'
 const props = defineProps({
   leader: { type: Object, default: null },
   canEditStrategy: { type: Boolean, default: false },
+  showFollowerCount: { type: Boolean, default: false },
   showFollowSection: { type: Boolean, default: true },
   activeFollow: { type: Object, default: null },
   pendingRequest: { type: Object, default: null },
@@ -352,6 +353,10 @@ function stepRatio(delta) {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   margin-bottom: 16px;
+}
+
+.ld-stats--duo {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .ld-stat {

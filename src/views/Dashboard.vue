@@ -221,6 +221,7 @@
     <LeaderDetailModal
       :leader="detailLeader"
       :can-edit-strategy="detailLeader ? canEditStrategyIntro(detailLeader) : false"
+      :show-follower-count="Boolean(currentUser?.isLeader)"
       :show-follow-section="canApplyFollow"
       :active-follow="detailActiveFollow"
       :pending-request="detailPendingRequest"
