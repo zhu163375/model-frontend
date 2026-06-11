@@ -33,9 +33,24 @@ header {
   box-sizing: border-box;
 }
 
-.header-left, .header-right { display: flex; align-items: center; gap: 16px; }
+.header-left, .header-right { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.header-right { flex-shrink: 0; margin-left: auto; }
+.header-user-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
 .system-title { font-size: 18px; font-weight: bold; }
-.user-display { font-size: 14px; color: #475569; font-weight: bold; }
+.user-display {
+  font-size: 14px;
+  color: #475569;
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}
 
 .container {
   display: grid;
@@ -86,6 +101,29 @@ table { width: 100%; border-collapse: collapse; text-align: left; }
 .hall-table .td-action {
   text-align: center;
   vertical-align: middle;
+}
+
+.hall-table .th-sortable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.hall-table .th-sortable:hover,
+.hall-table .th-sortable.is-sorted {
+  color: var(--primary);
+}
+
+.th-sortable-label {
+  display: inline-block;
+}
+
+.sort-indicator {
+  display: inline-block;
+  margin-left: 2px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--primary);
 }
 
 .btn-detail {
@@ -571,6 +609,28 @@ td.strategy-intro-cell {
 .sub-table { table-layout: auto; }
 .sub-table td:last-child { white-space: nowrap; }
 
+.followers-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.followers-table .col-follower-name,
+.followers-table .col-follower-ratio {
+  width: 50%;
+}
+
+.followers-table th:first-child,
+.followers-table td:first-child {
+  text-align: left;
+}
+
+.followers-table th:last-child,
+.followers-table td:last-child {
+  text-align: right;
+  padding-right: 20px;
+  white-space: nowrap;
+}
+
 .request-actions {
   display: inline-flex;
   flex-wrap: nowrap;
@@ -678,8 +738,6 @@ input[type="number"] { width: 45px; padding: 4px; text-align: center; }
 .follow-info { font-size: 14px; line-height: 1.8; }
 .empty-text { color: #94a3b8; font-size: 14px; }
 
-.btn-text-short { display: none; }
-
 @media (max-width: 768px) {
   :global(html), :global(body), :global(#app) {
     overflow: auto !important;
@@ -704,23 +762,22 @@ input[type="number"] { width: 45px; padding: 4px; text-align: center; }
     min-height: 56px;
     padding: 10px 16px;
     padding-top: max(10px, env(safe-area-inset-top));
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-
-  .header-left, .header-right {
-    flex-wrap: wrap;
-    gap: 8px;
+    gap: 12px;
   }
 
   .header-left {
-    flex: 1 1 100%;
-    justify-content: space-between;
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 8px;
   }
 
   .header-right {
-    flex: 1 1 100%;
-    justify-content: flex-end;
+    flex: 0 0 auto;
+    gap: 0;
+  }
+
+  .header-user-bar {
+    gap: 8px;
   }
 
   .system-title {
@@ -729,14 +786,8 @@ input[type="number"] { width: 45px; padding: 4px; text-align: center; }
 
   .user-display {
     font-size: 12px;
-    max-width: 120px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    max-width: 140px;
   }
-
-  .btn-text-full { display: none; }
-  .btn-text-short { display: inline; }
 
   .container {
     grid-template-columns: 1fr;
@@ -814,6 +865,60 @@ input[type="number"] { width: 45px; padding: 4px; text-align: center; }
     font-size: 12px;
   }
 
+  .followers-table th:first-child,
+  .followers-table td:first-child {
+    padding-left: 0;
+  }
+
+  .followers-table th:last-child,
+  .followers-table td:last-child {
+    padding-right: 12px;
+  }
+
+  .pending-requests-table {
+    table-layout: fixed;
+  }
+
+  .pending-requests-table .col-pending-name,
+  .pending-requests-table .col-pending-ratio,
+  .pending-requests-table .col-pending-action {
+    width: 33.33%;
+  }
+
+  .pending-requests-table th,
+  .pending-requests-table td {
+    text-align: center;
+    vertical-align: middle;
+    padding: 10px 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .pending-requests-table td:first-child {
+    white-space: nowrap;
+  }
+
+  .pending-requests-table td:last-child {
+    white-space: normal;
+  }
+
+  .pending-requests-table .request-actions {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .pending-requests-table .request-actions .btn {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    padding: 4px 4px;
+    font-size: 11px;
+  }
+
   .request-actions .btn {
     min-height: 0;
     padding: 4px 8px;
@@ -847,15 +952,8 @@ input[type="number"] { width: 45px; padding: 4px; text-align: center; }
     padding: 8px 12px;
   }
 
-  .header-right {
-    justify-content: space-between;
-  }
-
   .user-display {
-    order: -1;
-    flex: 1 1 100%;
-    max-width: none;
-    text-align: left;
+    max-width: 96px;
   }
 
   .system-title {

@@ -60,7 +60,7 @@
               v-if="mode !== 'notice'"
               ref="cancelButtonRef"
               type="button"
-              class="confirm-btn confirm-btn--ghost"
+              class="confirm-btn confirm-btn--ghost confirm-btn--default"
               @click="emitCancel"
             >
               {{ cancelText }}
@@ -333,9 +333,15 @@ onUnmounted(() => {
   border: 1px solid #cbd5e1;
 }
 
-.confirm-btn--ghost:hover {
+.confirm-btn--ghost:hover,
+.confirm-btn--ghost:focus-visible {
   background: #f8fafc;
   border-color: #94a3b8;
+}
+
+.confirm-btn--default {
+  border-color: #94a3b8;
+  box-shadow: 0 0 0 1px #e2e8f0;
 }
 
 .confirm-btn--primary {
@@ -397,7 +403,7 @@ onUnmounted(() => {
   }
 
   .confirm-actions:not(.confirm-actions--single) {
-    flex-direction: column-reverse;
+    flex-direction: column;
   }
 }
 </style>

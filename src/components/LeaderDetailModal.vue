@@ -11,13 +11,6 @@
           <div class="ld-header">
             <div class="ld-header-main">
               <h3 :id="titleId" class="ld-title">{{ leader.name }}</h3>
-              <span
-                v-if="followStatus?.label"
-                class="ld-status-badge"
-                :class="`ld-status-badge--${followStatus.status}`"
-              >
-                {{ followStatus.label }}
-              </span>
             </div>
             <button type="button" class="ld-close" aria-label="关闭" @click="emit('close')">
               ×
@@ -137,10 +130,40 @@
           </div>
 
           <div class="ld-footer">
-            <p v-if="showFollowSection && followStatus?.reason" class="ld-footer-hint">
+            <div
+              v-if="showFollowingAlert"
+              class="ld-footer-alert ld-footer-alert--following"
+              role="status"
+            >
+              <span class="ld-footer-alert__title">已跟随</span>
+              <p class="ld-footer-alert__text">{{ followingAlertText }}</p>
+            </div>
+            <div
+              v-else-if="showPendingAlert"
+              class="ld-footer-alert ld-footer-alert--pending"
+              role="status"
+            >
+              <span class="ld-footer-alert__title">待审批</span>
+              <p class="ld-footer-alert__text">{{ pendingAlertText }}</p>
+            </div>
+            <div
+              v-else-if="showFollowSection && followStatus?.status === 'no-funds' && followStatus?.reason"
+              class="ld-footer-alert ld-footer-alert--danger"
+              role="alert"
+            >
+              <span class="ld-footer-alert__title">资金不足</span>
+              <p class="ld-footer-alert__text">{{ followStatus.reason }}</p>
+            </div>
+            <p
+              v-else-if="showFollowSection && followStatus?.reason"
+              class="ld-footer-hint"
+            >
               {{ followStatus.reason }}
             </p>
-            <div class="ld-footer-actions" :class="{ 'ld-footer-actions--single': !showApplyButton }">
+            <div
+              class="ld-footer-actions"
+              :class="{ 'ld-footer-actions--single': !showApplyButton }"
+            >
               <button type="button" class="ld-cancel-btn" @click="emit('close')">
                 取消
               </button>
@@ -168,6 +191,8 @@ const props = defineProps({
   leader: { type: Object, default: null },
   canEditStrategy: { type: Boolean, default: false },
   showFollowSection: { type: Boolean, default: true },
+  activeFollow: { type: Object, default: null },
+  pendingRequest: { type: Object, default: null },
   ratioMin: { type: Number, required: true },
   maxRatio: { type: Number, required: true },
   quickRatios: { type: Array, default: () => [] },
@@ -195,11 +220,44 @@ const quotaUsedPercent = computed(() => {
   return Math.min(100, Math.round((used / cap) * 100))
 })
 
-const ratioControlsDisabled = computed(() => Boolean(props.followStatus?.disabled))
+const ratioControlsDisabled = computed(
+  () =>
+    Boolean(props.activeFollow) ||
+    Boolean(props.pendingRequest) ||
+    Boolean(props.followStatus?.disabled),
+)
+
+const showFollowingAlert = computed(
+  () => props.showFollowSection && Boolean(props.activeFollow),
+)
+
+const showPendingAlert = computed(
+  () => props.showFollowSection && Boolean(props.pendingRequest) && !props.activeFollow,
+)
 
 const showApplyButton = computed(
-  () => props.showFollowSection && props.followStatus?.status === 'ready',
+  () =>
+    props.showFollowSection &&
+    !props.activeFollow &&
+    !props.pendingRequest &&
+    props.followStatus?.status === 'ready',
 )
+
+const followingAlertText = computed(() => {
+  const ratio = props.activeFollow?.ratio ?? props.followStatus?.followingRatio
+  if (ratio != null && Number.isFinite(Number(ratio))) {
+    return `当前以 ${Number(ratio)} 倍跟随该导师，可在侧边栏解除跟随`
+  }
+  return '当前已跟随该导师，可在侧边栏解除跟随'
+})
+
+const pendingAlertText = computed(() => {
+  const ratio = props.pendingRequest?.ratio
+  if (ratio != null && Number.isFinite(Number(ratio))) {
+    return `已向该导师提交 ${Number(ratio)} 倍跟随申请，请等待导师审批`
+  }
+  return '已向该导师提交跟随申请，请等待导师审批'
+})
 
 function onRatioInput(event) {
   emit('ratio-input', event)
@@ -253,9 +311,6 @@ function stepRatio(delta) {
 }
 
 .ld-header-main {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
   min-width: 0;
 }
 
@@ -263,41 +318,6 @@ function stepRatio(delta) {
   margin: 0;
   font-size: 18px;
   color: #0f172a;
-}
-
-.ld-status-badge {
-  display: inline-flex;
-  align-self: flex-start;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.ld-status-badge--ready {
-  background: #dcfce7;
-  color: #15803d;
-}
-
-.ld-status-badge--following {
-  background: #dbeafe;
-  color: #1d4ed8;
-}
-
-.ld-status-badge--pending {
-  background: #fef3c7;
-  color: #b45309;
-}
-
-.ld-status-badge--full,
-.ld-status-badge--no-funds {
-  background: #fee2e2;
-  color: #b91c1c;
-}
-
-.ld-status-badge--leader {
-  background: #f1f5f9;
-  color: #64748b;
 }
 
 .ld-close {
@@ -579,6 +599,65 @@ function stepRatio(delta) {
   background: #fff;
 }
 
+.ld-footer-alert {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.ld-footer-alert--following {
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+}
+
+.ld-footer-alert--following .ld-footer-alert__title {
+  color: #047857;
+}
+
+.ld-footer-alert--following .ld-footer-alert__text {
+  color: #065f46;
+}
+
+.ld-footer-alert--pending {
+  border: 1px solid #fed7aa;
+  background: #fff7ed;
+}
+
+.ld-footer-alert--pending .ld-footer-alert__title {
+  color: #c2410c;
+}
+
+.ld-footer-alert--pending .ld-footer-alert__text {
+  color: #9a3412;
+}
+
+.ld-footer-alert--danger {
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+}
+
+.ld-footer-alert--danger .ld-footer-alert__title {
+  color: #b91c1c;
+}
+
+.ld-footer-alert--danger .ld-footer-alert__text {
+  color: #991b1b;
+}
+
+.ld-footer-alert__title {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.ld-footer-alert__text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
 .ld-footer-hint {
   margin: 0 0 10px;
   font-size: 13px;
@@ -596,17 +675,20 @@ function stepRatio(delta) {
   flex: 1;
 }
 
+/* 与 ConfirmDialog 的 confirm-btn--ghost 保持一致 */
 .ld-cancel-btn {
   flex: 1;
-  min-height: 48px;
-  padding: 12px 16px;
+  min-height: 40px;
+  padding: 0 16px;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   background: #fff;
   color: #475569;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+  appearance: none;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .ld-cancel-btn:hover {
@@ -620,10 +702,11 @@ function stepRatio(delta) {
   padding: 12px 16px;
   border: none;
   border-radius: 8px;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 600;
   color: #fff;
   cursor: pointer;
+  transition: background 0.15s ease;
 }
 
 .ld-apply-btn--ready {
@@ -635,7 +718,7 @@ function stepRatio(delta) {
 }
 
 .ld-apply-btn:disabled {
-  opacity: 0.7;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
@@ -674,37 +757,35 @@ function stepRatio(delta) {
     padding: 0 0 max(12px, env(safe-area-inset-bottom));
   }
 
+  .ld-footer-alert {
+    margin: 10px 16px 0;
+  }
+
   .ld-footer-hint {
     padding: 10px 16px 0;
   }
 
   .ld-footer-actions {
     flex-direction: column-reverse;
-    gap: 0;
+    gap: 10px;
     margin-top: 10px;
+    padding: 0 16px 12px;
   }
 
   .ld-footer-actions--single {
-    margin-top: 0;
+    margin-top: 10px;
   }
 
   .ld-cancel-btn,
   .ld-apply-btn {
     width: 100%;
     flex: none;
-    border-radius: 0;
-    min-height: 52px;
+    border-radius: 8px;
+    min-height: 40px;
   }
 
   .ld-cancel-btn {
-    border-left: none;
-    border-right: none;
-    border-bottom: none;
-    border-top: 1px solid #e2e8f0;
-  }
-
-  .ld-footer-actions--single .ld-cancel-btn {
-    border-top: none;
+    border: 1px solid #cbd5e1;
   }
 }
 </style>
